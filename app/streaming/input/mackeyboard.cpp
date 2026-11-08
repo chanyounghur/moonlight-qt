@@ -109,6 +109,9 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
                     event->state == SDL_PRESSED ? "down" : "up", event->keysym.scancode,
                     SDL_GetScancodeName(event->keysym.scancode));
     }
+    // Unknown one-shot IME events may have no release. They cannot be sent to
+    // the host and must not hold a pending input-source switch indefinitely.
+    if (event->keysym.scancode == SDL_SCANCODE_UNKNOWN) return;
 
     if (event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
         // Raw input or queued events from an earlier capture must not duplicate
