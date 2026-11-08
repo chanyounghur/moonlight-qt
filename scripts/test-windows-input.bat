@@ -11,8 +11,8 @@ qmake "%INPUT_TEST_ROOT%\tests\capslockcapture_test.pro" CONFIG+=release
 if errorlevel 1 exit /b 1
 nmake
 if errorlevel 1 exit /b 1
-set "PATH=%INPUT_TEST_ROOT%\build\deploy-x64-release;%PATH%"
-release\capslockcapture-test.exe
+set "PATH=%INPUT_TEST_ROOT%\libs\windows\lib\x64;%PATH%"
+capslockcapture-test.exe
 set INPUT_TEST_RESULT=%ERRORLEVEL%
 popd
 exit /b %INPUT_TEST_RESULT%
