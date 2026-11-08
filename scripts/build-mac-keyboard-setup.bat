@@ -9,7 +9,7 @@ call scripts\find-vswhere.bat
 if errorlevel 1 exit /b 1
 for /f "usebackq delims=" %%i in (`%VSWHERE% -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" amd64
 if errorlevel 1 exit /b 1
-msbuild -Restore wix\MoonlightSetup\MoonlightSetup.wixproj /p:Configuration=Release /p:Platform=x64 /p:MSBuildProjectExtensionsPath="%BUILD_FOLDER%\"
+msbuild -Restore wix\MoonlightSetup\MoonlightSetup.wixproj /p:Configuration=Release /p:Platform=x64 /p:MSBuildProjectExtensionsPath="%BUILD_FOLDER%"
 if errorlevel 1 exit /b 1
 copy "%INSTALLER_FOLDER%\MoonlightSetup.exe" "%INSTALLER_FOLDER%\Moonlight-MacKeyboard-v5-x64-Setup.exe"
 exit /b %ERRORLEVEL%
