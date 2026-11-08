@@ -14,6 +14,7 @@ struct Rule {
     int trigger;
     unsigned modifiers;
     std::vector<int> output;
+    bool holdModifiers = false;
 };
 
 struct KeyEvent {
@@ -64,7 +65,17 @@ public:
             if (m_Physical.erase(key) == 0) {
                 return result; // Includes late ups after a focus change/reset.
             }
-            m_Active.erase(key);
+        }
+
+        const auto physicalModifiers = modifiersFor(m_Physical);
+        for (auto it = m_Active.begin(); it != m_Active.end();) {
+            const auto& rule = it->second;
+            const bool sourceModifiersHeld = rule.modifiers != 0 &&
+                (physicalModifiers & rule.modifiers) == rule.modifiers;
+            if (!m_Physical.count(it->first) && !(rule.holdModifiers && sourceModifiersHeld)) {
+                it = m_Active.erase(it);
+            }
+            else ++it;
         }
 
         // Bind a mapping until its trigger is released, even if the user lets
@@ -81,7 +92,18 @@ public:
             }
         }
         for (const auto& binding : m_Active) {
-            desired.insert(binding.second.output.begin(), binding.second.output.end());
+            const auto& rule = binding.second;
+            const bool triggerHeld = m_Physical.count(binding.first) != 0;
+            const bool sourceModifiersHeld = rule.modifiers != 0 &&
+                (physicalModifiers & rule.modifiers) == rule.modifiers;
+            for (int output : rule.output) {
+                const bool modifier = modifierFor(output) != 0;
+                // Alt+Tab keeps Command down between Tab taps, then releases it
+                // as soon as Alt is released (even if Tab is still held).
+                if (modifier ? (!rule.holdModifiers || sourceModifiersHeld) : triggerHeld) {
+                    desired.insert(output);
+                }
+            }
         }
         reconcile(desired, result.events);
         return result;

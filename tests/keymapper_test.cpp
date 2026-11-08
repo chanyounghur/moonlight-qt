@@ -24,7 +24,7 @@ KeyMapper mapper()
     result.configure({{Ctrl, Control}, {RightCtrl, Control}, {ShiftKey, Shift},
                       {AltKey, Alt}, {RightAlt, Alt}, {Cmd, Meta}},
                      {{Caps, 0, {Ctrl, Space}}, {Space, Alt, {Cmd, Space}},
-                      {Tab, Alt, {Cmd, Tab}}}, Z, Control | Alt | Shift);
+                      {Tab, Alt, {Cmd, Tab}, true}}, Z, Control | Alt | Shift);
     return result;
 }
 
@@ -80,6 +80,22 @@ int main()
         expect(m.process(Tab, false), {{Tab, false}}); // Command is shared.
         expect(m.process(AltKey, false), {});
         expect(m.process(Space, false), {{Space, false}, {Cmd, false}});
+    }
+    {
+        auto m = mapper();
+        m.process(AltKey, true);
+        expect(m.process(Tab, true), {{AltKey, false}, {Cmd, true}, {Tab, true}});
+        expect(m.process(Tab, false), {{Tab, false}});
+        expect(m.process(Tab, true), {{Tab, true}});
+        expect(m.process(Tab, false), {{Tab, false}});
+        expect(m.process(AltKey, false), {{Cmd, false}});
+    }
+    {
+        auto m = mapper();
+        m.process(AltKey, true);
+        m.process(Tab, true);
+        expect(m.process(AltKey, false), {{Cmd, false}});
+        expect(m.process(Tab, false), {{Tab, false}});
     }
     {
         auto m = mapper();

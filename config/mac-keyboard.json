@@ -5,6 +5,6 @@
   "mappings": [
     { "from": "CapsLock", "to": "Ctrl+Space" },
     { "from": "Alt+Space", "to": "Command+Space" },
-    { "from": "Alt+Tab", "to": "Command+Tab" }
+    { "from": "Alt+Tab", "to": "Command+Tab", "holdModifiers": true }
   ]
 }

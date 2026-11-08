@@ -74,7 +74,12 @@ void SdlInputHandler::initializeMacKeyboard()
             valid = false;
             break;
         }
-        rules.push_back({inputKey, inputMods, outputKeys(outputKey, outputMods)});
+        const bool holdModifiers = mapping.value("holdModifiers").toBool(false);
+        if (holdModifiers && (inputMods == 0 || outputMods == 0)) {
+            valid = false;
+            break;
+        }
+        rules.push_back({inputKey, inputMods, outputKeys(outputKey, outputMods), holdModifiers});
     }
     if (!valid) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Invalid mac-keyboard.json; profile disabled");
