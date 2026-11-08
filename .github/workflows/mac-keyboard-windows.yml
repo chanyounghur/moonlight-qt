@@ -60,6 +60,7 @@ jobs:
         shell: cmd
         run: scripts\build-mac-keyboard-setup.bat
       - name: Test official upgrade and clean installation
+        timeout-minutes: 12
         shell: pwsh
         run: ./scripts/test-mac-keyboard-installer.ps1
       - name: Upload installer
@@ -77,5 +78,8 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: Installer-diagnostics-${{ github.run_number }}
-          path: build/installer-tests/*.log
+          path: |
+            build/installer-tests/*.log
+            build/installer-x64-release/Moonlight-MacKeyboard-v5-x64-Setup.exe
+            build/deploy-x64-release/source-commit.txt
           if-no-files-found: ignore
