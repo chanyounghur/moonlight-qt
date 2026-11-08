@@ -5,6 +5,7 @@
 #include <string>
 #include <stdexcept>
 #include <cstdint>
+#include <vector>
 
 void check(bool ok, const char* message);
 HWND nativeWindow(SDL_Window* window);
@@ -18,6 +19,7 @@ struct ProbeState {
 };
 
 NativeKeyboardCapture* recordingScope = nullptr;
+std::vector<unsigned> sequence;
 void record(const SDL_Event& source, ProbeState& state)
 {
     SDL_Event event = source;
@@ -28,6 +30,7 @@ void record(const SDL_Event& source, ProbeState& state)
     }
     if (event.type != SDL_KEYDOWN && event.type != SDL_KEYUP) return;
     const bool down = event.type == SDL_KEYDOWN;
+    sequence.push_back(static_cast<unsigned>(event.key.keysym.scancode) | (down ? 1024 : 0));
     switch (event.key.keysym.scancode) {
     case SDL_SCANCODE_RALT: InterlockedIncrement(down ? &state.altDown : &state.altUp); break;
     case SDL_SCANCODE_LCTRL: InterlockedIncrement(down ? &state.ctrlDown : &state.ctrlUp); break;
@@ -165,6 +168,42 @@ void testNativeKeyboardCapture(SDL_Window* stream, SDL_Window* other)
         sendScan(nativeWindow(stream), 0x38, true, false);
         pump(&received);
         check(received.altDown == 1 && received.altUp == 1, "raw right Alt needs one down AND up under Korean layout");
+
+        // No sleeps between events: a raw right-Alt release must precede the
+        // following intercepted letter, even when sent in one Windows batch.
+        sequence.clear();
+        std::vector<INPUT> burst;
+        std::vector<unsigned> expected;
+        for (int repeat = 0; repeat < 100; ++repeat) {
+            for (const auto code : {unsigned(SDL_SCANCODE_RALT)|1024, unsigned(SDL_SCANCODE_C)|1024,
+                                   unsigned(SDL_SCANCODE_C), unsigned(SDL_SCANCODE_RALT),
+                                   unsigned(SDL_SCANCODE_C)|1024, unsigned(SDL_SCANCODE_C)}) {
+                const bool alt = (code & 1023) == SDL_SCANCODE_RALT;
+                INPUT input{}; input.type = INPUT_KEYBOARD;
+                input.ki.wScan = alt ? 0x38 : 0x2e;
+                input.ki.dwFlags = KEYEVENTF_SCANCODE | (alt ? KEYEVENTF_EXTENDEDKEY : 0) | (code & 1024 ? 0 : KEYEVENTF_KEYUP);
+                burst.push_back(input); expected.push_back(code);
+            }
+        }
+        check(SendInput(static_cast<UINT>(burst.size()), burst.data(), sizeof(INPUT)) == burst.size(), "burst SendInput failed");
+        pump(&received, 1000);
+        if (sequence != expected) {
+            std::cerr << "Ordered keyboard burst got " << sequence.size() << " expected " << expected.size() << '\n';
+            for (size_t i = 0; i < sequence.size() && i < expected.size(); ++i) {
+                if (sequence[i] != expected[i]) { std::cerr << "First mismatch " << i << ": " << sequence[i] << " != " << expected[i] << '\n'; break; }
+            }
+        }
+        check(sequence == expected, "right Alt and ordinary keys were lost, duplicated, or reordered");
+
+        // Windows shortcuts must remain in the stream, including Alt+Tab.
+        sendScan(nativeWindow(stream), 0x38, false, true);
+        sendScan(nativeWindow(stream), 0x0f, false, true);
+        sendScan(nativeWindow(stream), 0x0f, false, false);
+        sendScan(nativeWindow(stream), 0x38, false, false);
+        sendScan(nativeWindow(stream), 0x5b, true, true);
+        sendScan(nativeWindow(stream), 0x5b, true, false);
+        pump(&received);
+        check(GetForegroundWindow() == nativeWindow(stream), "Alt+Tab or Windows key escaped capture");
 
         // Leave capture before transferring focus, as an explicit escape would.
         scope.setActive(nullptr, false);

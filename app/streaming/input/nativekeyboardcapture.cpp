@@ -30,6 +30,11 @@ void close(HANDLE& handle) { if (handle) CloseHandle(handle); handle = nullptr; 
 SDL_Scancode scan(DWORD code, DWORD vk, bool extended) {
     if (vk == VK_PAUSE) return SDL_SCANCODE_PAUSE;
     if (vk == VK_SNAPSHOT) return SDL_SCANCODE_PRINTSCREEN;
+    if (!code) {
+        const auto mapped = MapVirtualKeyW(vk, MAPVK_VK_TO_VSC_EX);
+        code = mapped & 0xff;
+        extended = extended || (mapped & 0xff00) == 0xe000;
+    }
     if (code > 0x7f) return SDL_SCANCODE_UNKNOWN;
     return windows_scancode_table[code | (extended ? 0x80 : 0)];
 }
@@ -262,6 +267,13 @@ bool NativeKeyboardCapture::active() const {
     return m_Impl->generation && m_Impl->shared && !m_Impl->broken && read(m_Impl->shared->enabled);
 #else
     return false;
+#endif
+}
+int NativeKeyboardCapture::localToggleState() const {
+#ifdef _WIN32
+    return GetKeyState(VK_CAPITAL) & 1;
+#else
+    return -1;
 #endif
 }
 bool NativeKeyboardCapture::owns(const SDL_KeyboardEvent& event) const {

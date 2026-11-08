@@ -337,17 +337,16 @@ void SdlInputHandler::updateKeyboardGrabState()
 
     m_KeyboardCaptureActive = shouldGrab;
     if (m_MacKeyboardEnabled) {
+        const bool wasActive = m_NativeKeyboardCapture.active();
         if (!m_NativeKeyboardCapture.setActive(m_Window, shouldGrab, m_BlockLocalCapsLock)) {
             m_KeyboardCaptureActive = false;
             m_MacKeyboardReleased = true;
             raiseAllKeys();
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Mac native keyboard unavailable; capture released");
         }
-        const bool wasActive = m_CapsLockCapture.active();
-        m_CapsLockCapture.setActive(m_Window, false);
-        if (m_TraceCapsLock && wasActive != m_CapsLockCapture.active()) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "CapsLock capture %s; Windows toggle=%d",
-                        m_CapsLockCapture.active() ? "on" : "off", m_CapsLockCapture.localToggleState());
+        if (m_TraceCapsLock && wasActive != m_NativeKeyboardCapture.active()) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac native keyboard %s; Windows toggle=%d",
+                        m_NativeKeyboardCapture.active() ? "on" : "off", m_NativeKeyboardCapture.localToggleState());
         }
     }
 }

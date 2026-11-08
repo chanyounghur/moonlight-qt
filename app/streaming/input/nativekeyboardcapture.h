@@ -14,6 +14,7 @@ public:
     bool owns(const SDL_KeyboardEvent& event) const;
     bool translate(const SDL_UserEvent& event, SDL_KeyboardEvent& key) const;
     bool failed(const SDL_UserEvent& event) const;
+    int localToggleState() const;
     static bool hasForeground(SDL_Window* window);
     // Called before Qt/SDL initialization. Returns -1 for ordinary app startup.
     static int runHelper(int argc, char** argv);

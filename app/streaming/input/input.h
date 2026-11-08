@@ -5,7 +5,6 @@
 
 #include "SDL_compat.h"
 #include "keymapper.h"
-#include "capslockcapture.h"
 #include "nativekeyboardcapture.h"
 
 struct GamepadState {
@@ -168,7 +167,6 @@ private:
     bool m_TraceCapsLock = false;
     bool m_TraceModifierKeys = false;
     NativeKeyboardCapture m_NativeKeyboardCapture;
-    CapsLockCapture m_CapsLockCapture;
     macinput::KeyMapper m_MacKeyMapper;
     QSet<int> m_MacMouseButtonsDown;
 

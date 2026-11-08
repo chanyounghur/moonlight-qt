@@ -122,14 +122,11 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     if (event->keysym.scancode == SDL_SCANCODE_UNKNOWN) return;
 
     if (event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
-        // Raw input or queued events from an earlier capture must not duplicate
-        // the Caps Lock transition injected by our current native hook.
-        if (m_CapsLockCapture.active() && !m_NativeKeyboardCapture.owns(*event)) return;
         if (m_TraceCapsLock) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "CapsLock RX %s; nativeCapture=%d; Windows toggle=%d",
                         event->state == SDL_PRESSED ? "down" : "up",
-                        m_NativeKeyboardCapture.owns(*event), m_CapsLockCapture.localToggleState());
+                        m_NativeKeyboardCapture.owns(*event), m_NativeKeyboardCapture.localToggleState());
         }
     }
 
