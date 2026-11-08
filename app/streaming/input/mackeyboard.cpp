@@ -48,9 +48,10 @@ void SdlInputHandler::initializeMacKeyboard()
 
     int escapeKey = 0;
     unsigned escapeModifiers = 0;
+    const auto capsLockMode = config.value("capsLock").toString();
     const bool valid = config.value("version").toInt() == 2 &&
         config.value("layout").toString() == "mac" &&
-        config.value("capsLock").toString() == "passthrough" &&
+        (capsLockMode == "passthrough" || capsLockMode == "ctrl-space") &&
         !config.contains("mappings") &&
         parseChord(config.value("escape").toString(), escapeKey, escapeModifiers) &&
         escapeModifiers != 0;
@@ -59,14 +60,18 @@ void SdlInputHandler::initializeMacKeyboard()
         return;
     }
 
-    // Swap roles for every combination. Ordinary keys, including Caps Lock,
-    // pass through; macOS and the focused application interpret the shortcuts.
+    // Swap roles for every combination. Caps Lock has a separately opt-in
+    // input-source workaround for hosts that cannot inject native Caps Lock.
+    macinput::InputSourceShortcut inputSource;
+    if (capsLockMode == "ctrl-space") {
+        inputSource = {SDL_SCANCODE_CAPSLOCK, SDL_SCANCODE_LCTRL, SDL_SCANCODE_SPACE};
+    }
     m_MacKeyMapper.configure(modifierKeys, {
         {SDL_SCANCODE_LALT, SDL_SCANCODE_LGUI}, {SDL_SCANCODE_RALT, SDL_SCANCODE_RGUI},
         {SDL_SCANCODE_LGUI, SDL_SCANCODE_LALT}, {SDL_SCANCODE_RGUI, SDL_SCANCODE_RALT},
         // This keyboard's Super key emits Application/Menu, not Windows.
         {SDL_SCANCODE_APPLICATION, SDL_SCANCODE_RGUI},
-    }, escapeKey, escapeModifiers);
+    }, escapeKey, escapeModifiers, inputSource);
     m_BlockLocalCapsLock = config.value("blockLocalCapsLock").toBool(true);
     m_TraceCapsLock = config.value("traceCapsLock").toBool(false);
     m_NormalizeKoreanModifiers = config.value("normalizeKoreanModifiers").toBool(true);
@@ -76,7 +81,8 @@ void SdlInputHandler::initializeMacKeyboard()
     m_PointerRegionLockActive = false;
     m_PointerRegionLockToggledByUser = true;
     m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard layout v2; CapsLock passthrough; free mouse; escape: %s",
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard layout v4; CapsLock %s; free mouse; escape: %s",
+                capsLockMode.toUtf8().constData(),
                 config.value("escape").toString().toUtf8().constData());
 #endif
 }
@@ -117,6 +123,10 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     }
 
     const auto result = m_MacKeyMapper.process(event->keysym.scancode, event->state == SDL_PRESSED);
+    if (m_TraceCapsLock && result.inputSourceSwitches) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "CapsLock input-source shortcut: Ctrl+Space; taps=%u",
+                    result.inputSourceSwitches);
+    }
     for (const auto& output : result.events) {
         SDL_KeyboardEvent translated = *event;
         translated.state = output.down ? SDL_PRESSED : SDL_RELEASED;

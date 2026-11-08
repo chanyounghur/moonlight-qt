@@ -1,6 +1,7 @@
 #pragma once
 
-// Key roles, not shortcut recipes. No SDL, Qt, or protocol dependency.
+// Key roles plus one optional input-source compatibility shortcut.
+// No SDL, Qt, or protocol dependency.
 #include <map>
 #include <set>
 #include <utility>
@@ -9,18 +10,24 @@
 namespace macinput {
 enum Modifier : unsigned { Control = 1, Alt = 2, Shift = 4, Meta = 8 };
 struct KeyEvent { int key; bool down; unsigned modifiers; };
-struct Result { std::vector<KeyEvent> events; bool releaseCapture = false; };
+struct Result {
+    std::vector<KeyEvent> events;
+    bool releaseCapture = false;
+    unsigned inputSourceSwitches = 0;
+};
+struct InputSourceShortcut { int trigger = 0; int control = 0; int space = 0; };
 
 class KeyMapper {
 public:
     void configure(std::map<int, unsigned> modifiers, std::map<int, int> keyMap,
-                   int escapeKey, unsigned escapeModifiers)
+                   int escapeKey, unsigned escapeModifiers, InputSourceShortcut inputSource = {})
     {
         clear();
         m_Modifiers = std::move(modifiers);
         m_KeyMap = std::move(keyMap);
         m_EscapeKey = escapeKey;
         m_EscapeModifiers = escapeModifiers;
+        m_InputSource = inputSource;
     }
 
     Result process(int key, bool down)
@@ -38,17 +45,34 @@ public:
         }
         else if (m_Physical.erase(key) == 0) return result;
 
+        if (m_InputSource.trigger && key == m_InputSource.trigger && down) {
+            ++m_PendingInputSourceSwitches;
+        }
+
         std::set<int> desired;
         for (int physical : m_Physical) {
+            if (m_InputSource.trigger && physical == m_InputSource.trigger) continue;
             const auto mapped = m_KeyMap.find(physical);
             desired.insert(mapped == m_KeyMap.end() ? physical : mapped->second);
         }
         reconcile(desired, result.events);
+
+        // A complete tap, never a held Ctrl/Space. Wait for other keys to be
+        // released rather than mix the shortcut with Command/Shift or interrupt
+        // a held Space. Focus loss/escape discards pending switches in clear().
+        if (desired.empty()) {
+            while (m_PendingInputSourceSwitches) {
+                reconcile({m_InputSource.control, m_InputSource.space}, result.events);
+                reconcile({}, result.events);
+                --m_PendingInputSourceSwitches;
+                ++result.inputSourceSwitches;
+            }
+        }
         return result;
     }
 
     // The adapter releases actual protocol keys on focus loss/disconnect.
-    void clear() { m_Physical.clear(); m_Emitted.clear(); }
+    void clear() { m_Physical.clear(); m_Emitted.clear(); m_PendingInputSourceSwitches = 0; }
 
 private:
     unsigned modifierFor(int key) const
@@ -89,6 +113,8 @@ private:
     std::map<int, int> m_KeyMap;
     int m_EscapeKey = 0;
     unsigned m_EscapeModifiers = 0;
+    InputSourceShortcut m_InputSource;
+    unsigned m_PendingInputSourceSwitches = 0;
     std::set<int> m_Physical;
     std::set<int> m_Emitted;
 };

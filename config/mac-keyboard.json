@@ -3,7 +3,7 @@
   "enabled": true,
   "escape": "Ctrl+Alt+Shift+Z",
   "layout": "mac",
-  "capsLock": "passthrough",
+  "capsLock": "ctrl-space",
   "blockLocalCapsLock": true,
   "normalizeKoreanModifiers": true,
   "traceModifierKeys": true,

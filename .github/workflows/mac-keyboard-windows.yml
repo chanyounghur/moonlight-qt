@@ -63,6 +63,7 @@ jobs:
         run: |
           Copy-Item config/mac-keyboard.json build/deploy-x64-release/mac-keyboard.json
           Copy-Item docs/MAC-KEYBOARD.md build/deploy-x64-release/MAC-KEYBOARD.md
+          Copy-Item docs/MAC-KEYBOARD-START.txt build/deploy-x64-release/START-HERE.txt
           # Reuse the installed client's settings and pairing certificates.
           if (Test-Path build/deploy-x64-release/portable.dat) {
             Remove-Item -LiteralPath build/deploy-x64-release/portable.dat

@@ -13,14 +13,15 @@ void check(bool value, const char* message)
     if (!value) { std::cerr << "FAIL: " << message << '\n'; std::exit(1); }
 }
 
-KeyMapper mapper()
+KeyMapper mapper(bool inputSource = false)
 {
     KeyMapper result;
     result.configure({{Ctrl, Control}, {RightCtrl, Control}, {ShiftKey, Shift}, {RightShift, Shift},
                       {AltKey, Alt}, {RightAlt, Alt}, {Win, Meta}, {RightWin, Meta}},
                      {{AltKey, Win}, {Win, AltKey}, {RightAlt, RightWin}, {RightWin, RightAlt},
                       {Application, RightWin}},
-                     Z, Control | Alt | Shift);
+                     Z, Control | Alt | Shift,
+                     inputSource ? InputSourceShortcut{Caps, Ctrl, Space} : InputSourceShortcut{});
     return result;
 }
 
@@ -38,6 +39,76 @@ void expect(const Result& result, std::initializer_list<std::pair<int, bool>> ex
 int main()
 {
     {
+        auto m = mapper(true);
+        auto result = m.process(Caps, true);
+        expect(result, {{Ctrl, true}, {Space, true}, {Space, false}, {Ctrl, false}});
+        check(result.inputSourceSwitches == 1, "one switch on Caps Lock down");
+        check(result.events[1].modifiers == Control && result.events[2].modifiers == Control &&
+              result.events[3].modifiers == 0, "shortcut modifier flags and release");
+        expect(m.process(Caps, true), {}); // Held Caps Lock never repeats.
+        result = m.process(A, true);
+        expect(result, {{A, true}});
+        check(result.events[0].modifiers == 0, "held Caps Lock must not hold Control");
+        expect(m.process(A, false), {{A, false}});
+        expect(m.process(Caps, false), {});
+        expect(m.process(Caps, true), {{Ctrl, true}, {Space, true}, {Space, false}, {Ctrl, false}});
+        expect(m.process(Caps, false), {});
+    }
+    {
+        // Do not mix the shortcut with a held modifier or an already-held Space.
+        for (int held : {ShiftKey, Ctrl, RightCtrl, AltKey, Win, Application, Space, A}) {
+            auto m = mapper(true);
+            auto heldDown = m.process(held, true);
+            const int outputKey = heldDown.events[0].key;
+            auto pending = m.process(Caps, true);
+            expect(pending, {});
+            check(pending.inputSourceSwitches == 0, "wait until other key is released");
+            expect(m.process(Caps, false), {});
+            auto result = m.process(held, false);
+            expect(result, {{outputKey, false}, {Ctrl, true}, {Space, true}, {Space, false}, {Ctrl, false}});
+            check(result.events[2].modifiers == Control, "delayed shortcut has only Control");
+            check(result.inputSourceSwitches == 1, "deferred switch emitted once");
+        }
+    }
+    {
+        auto m = mapper(true);
+        m.process(ShiftKey, true);
+        for (int i = 0; i < 2; ++i) {
+            expect(m.process(Caps, true), {});
+            expect(m.process(Caps, false), {});
+        }
+        auto result = m.process(ShiftKey, false);
+        check(result.inputSourceSwitches == 2, "preserve two separate taps while deferred");
+        expect(result, {{ShiftKey, false}, {Ctrl, true}, {Space, true}, {Space, false}, {Ctrl, false},
+                       {Ctrl, true}, {Space, true}, {Space, false}, {Ctrl, false}});
+    }
+    {
+        auto m = mapper(true);
+        m.process(AltKey, true);
+        m.process(Caps, true);
+        m.clear(); // Focus loss releases host keys in the adapter and cancels work.
+        expect(m.process(AltKey, false), {});
+        expect(m.process(Caps, false), {});
+        expect(m.process(A, true), {{A, true}});
+        expect(m.process(A, false), {{A, false}});
+        expect(m.process(Caps, true), {{Ctrl, true}, {Space, true}, {Space, false}, {Ctrl, false}});
+    }
+    {
+        auto m = mapper(true);
+        m.process(Ctrl, true);
+        m.process(AltKey, true);
+        m.process(ShiftKey, true);
+        m.process(Caps, true);
+        auto result = m.process(Z, true);
+        check(result.releaseCapture && result.inputSourceSwitches == 0, "escape cancels pending switch");
+        expect(result, {{Ctrl, false}, {ShiftKey, false}, {Win, false}});
+        expect(m.process(Caps, false), {});
+        expect(m.process(ShiftKey, false), {});
+        expect(m.process(AltKey, false), {});
+        expect(m.process(Ctrl, false), {});
+        expect(m.process(Z, false), {});
+    }
+    {
         auto m = mapper();
         expect(m.process(Application, true), {{RightWin, true}});
         auto event = m.process(C, true);
@@ -52,7 +123,7 @@ int main()
     }
     {
         auto m = mapper();
-        expect(m.process(Caps, true), {{Caps, true}}); // Never synthesize Ctrl+Space.
+        expect(m.process(Caps, true), {{Caps, true}}); // Passthrough stays available.
         expect(m.process(Caps, true), {});
         expect(m.process(Caps, false), {{Caps, false}});
         expect(m.process(Caps, false), {});
@@ -123,11 +194,13 @@ int main()
         std::mt19937 random(20261108);
         const int keys[] = {A, Caps, Space, Tab, Ctrl, RightCtrl, AltKey, RightAlt,
                             ShiftKey, RightShift, Win, RightWin, Application};
-        for (int scenario = 0; scenario < 1000; ++scenario) {
-            auto m = mapper();
+        for (int scenario = 0; scenario < 2000; ++scenario) {
+            const bool inputSource = scenario >= 1000;
+            auto m = mapper(inputSource);
             std::set<int> host;
             auto replay = [&](const Result& result) {
                 for (const auto& event : result.events) {
+                    if (inputSource) check(event.key != Caps, "workaround must not send native Caps Lock");
                     if (event.down) check(host.insert(event.key).second, "duplicate host down");
                     else check(host.erase(event.key) == 1, "orphan host up");
                 }
@@ -138,5 +211,5 @@ int main()
             check(host.empty(), "all physical releases leave host empty");
         }
     }
-    std::cout << "Mac layout and raw Caps Lock tests passed (1000 randomized sequences).\n";
+    std::cout << "Mac layout and Caps Lock passthrough/shortcut tests passed (2000 randomized sequences).\n";
 }
