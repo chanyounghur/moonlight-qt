@@ -1,0 +1,202 @@
+#define SDL_MAIN_HANDLED
+#include "streaming/input/rawkeyboardscope.h"
+#include <SDL_syswm.h>
+#include <iostream>
+#include <string>
+#include <stdexcept>
+#include <cstdint>
+
+void check(bool ok, const char* message);
+HWND nativeWindow(SDL_Window* window);
+
+namespace {
+struct ProbeState {
+    HWND window;
+    HKL layout;
+    volatile LONG ready, done;
+    volatile LONG altDown, altUp, ctrlDown, ctrlUp, cDown, cUp;
+};
+
+void record(const SDL_Event& event, ProbeState& state)
+{
+    if (event.type != SDL_KEYDOWN && event.type != SDL_KEYUP) return;
+    const bool down = event.type == SDL_KEYDOWN;
+    switch (event.key.keysym.scancode) {
+    case SDL_SCANCODE_RALT: InterlockedIncrement(down ? &state.altDown : &state.altUp); break;
+    case SDL_SCANCODE_LCTRL: InterlockedIncrement(down ? &state.ctrlDown : &state.ctrlUp); break;
+    case SDL_SCANCODE_C: InterlockedIncrement(down ? &state.cDown : &state.cUp); break;
+    default: break;
+    }
+}
+
+void pump(ProbeState* state = nullptr, Uint32 duration = 150)
+{
+    const auto start = SDL_GetTicks();
+    do {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) if (state) record(event, *state);
+        SDL_Delay(5);
+    } while (SDL_GetTicks() - start < duration);
+}
+
+void sendScan(HWND window, WORD scan, bool extended, bool down)
+{
+    check(GetForegroundWindow() == window, "lost foreground before raw test input");
+    INPUT input{};
+    input.type = INPUT_KEYBOARD;
+    input.ki.wScan = scan;
+    input.ki.dwFlags = KEYEVENTF_SCANCODE | (extended ? KEYEVENTF_EXTENDEDKEY : 0) | (down ? 0 : KEYEVENTF_KEYUP);
+    check(SendInput(1, &input, sizeof(input)) == 1, "scan-code SendInput failed");
+}
+
+struct Peer {
+    HANDLE mapping = nullptr;
+    ProbeState* state = nullptr;
+    PROCESS_INFORMATION process{};
+    Peer(const char* mode, unsigned index) {
+        const auto name = "Local\\MoonlightRawTest-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(index);
+        mapping = CreateFileMappingA(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(ProbeState), name.c_str());
+        check(mapping != nullptr, "probe mapping failed");
+        state = static_cast<ProbeState*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(ProbeState)));
+        check(state != nullptr, "probe mapping view failed");
+        *state = {};
+        char exe[MAX_PATH];
+        check(GetModuleFileNameA(nullptr, exe, MAX_PATH) != 0, "test path unavailable");
+        auto command = std::string("\"") + exe + "\" " + mode + " " + name;
+        STARTUPINFOA startup{};
+        startup.cb = sizeof(startup);
+        check(CreateProcessA(nullptr, command.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW,
+                             nullptr, nullptr, &startup, &process), "external probe launch failed");
+        AllowSetForegroundWindow(process.dwProcessId);
+        const auto started = SDL_GetTicks();
+        while (!state->ready && SDL_GetTicks() - started < 10000) pump(nullptr, 10);
+        check(state->ready && state->window, "external probe failed to initialize");
+    }
+    ~Peer() {
+        if (state) InterlockedExchange(&state->done, 1);
+        if (process.hProcess) { WaitForSingleObject(process.hProcess, 5000); CloseHandle(process.hProcess); }
+        if (process.hThread) CloseHandle(process.hThread);
+        if (state) UnmapViewOfFile(state);
+        if (mapping) CloseHandle(mapping);
+    }
+};
+
+void foreground(HWND window)
+{
+    SetForegroundWindow(window);
+    pump();
+    check(GetForegroundWindow() == window, "test foreground transition failed");
+}
+}
+
+int runKeyboardPeer(const char* mode, const char* name)
+{
+    const bool raw = std::string(mode) == "--raw-peer";
+    auto mapping = OpenFileMappingA(FILE_MAP_ALL_ACCESS, FALSE, name);
+    if (!mapping) return 2;
+    auto* state = static_cast<ProbeState*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(ProbeState)));
+    if (!state) return 3;
+    SDL_SetMainReady();
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) return 4;
+    auto* window = SDL_CreateWindow(raw ? "Second raw stream" : "Other Windows app", 550, raw ? 300 : 500, 350, 160, SDL_WINDOW_SHOWN);
+    if (!window) return 5;
+    // Test fixture only; production must never load or activate an OS layout.
+    auto korean = LoadKeyboardLayoutW(L"00000412", KLF_ACTIVATE);
+    if (!korean || !ActivateKeyboardLayout(korean, 0)) return 6;
+    RawKeyboardScope scope;
+    state->window = nativeWindow(window);
+    state->layout = GetKeyboardLayout(0);
+    InterlockedExchange(&state->ready, 1);
+    while (!state->done) {
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (raw && event.type == SDL_WINDOWEVENT) {
+                if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                    scope.setActive(window, true);
+                    SDL_SetWindowKeyboardGrab(window, SDL_TRUE);
+                } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+                    SDL_SetWindowKeyboardGrab(window, SDL_FALSE);
+                    scope.setActive(nullptr, false);
+                }
+            }
+            record(event, *state);
+        }
+        state->layout = GetKeyboardLayout(0);
+        SDL_Delay(5);
+    }
+    SDL_SetWindowKeyboardGrab(window, SDL_FALSE);
+    scope.setActive(nullptr, false);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+    UnmapViewOfFile(state);
+    CloseHandle(mapping);
+    return 0;
+}
+
+void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other)
+{
+    (void)other;
+    const auto original = GetKeyboardLayout(0);
+    foreground(nativeWindow(stream));
+    const auto korean = LoadKeyboardLayoutW(L"00000412", KLF_ACTIVATE);
+    check(korean && ActivateKeyboardLayout(korean, 0), "Korean test fixture unavailable");
+    pump();
+    RawKeyboardScope scope;
+    try {
+        Peer second("--raw-peer", 1);
+        Peer local("--local-peer", 2);
+        foreground(nativeWindow(stream));
+        ActivateKeyboardLayout(korean, 0); // Fixture, before capture starts.
+        pump();
+        const auto layoutCount = GetKeyboardLayoutList(0, nullptr);
+        check(scope.setActive(stream, true), "raw capture activation failed");
+        SDL_SetWindowKeyboardGrab(stream, SDL_TRUE);
+        pump();
+        check(GetKeyboardLayout(0) == korean, "raw capture changed Korean keyboard layout");
+        ProbeState received{};
+        sendScan(nativeWindow(stream), 0x38, true, true);
+        pump(&received);
+        sendScan(nativeWindow(stream), 0x38, true, false);
+        pump(&received);
+        check(received.altDown == 1 && received.altUp == 1, "raw right Alt needs one down AND up under Korean layout");
+
+        // Leave capture before transferring focus, as an explicit escape would.
+        SDL_SetWindowKeyboardGrab(stream, SDL_FALSE);
+        scope.setActive(nullptr, false);
+        foreground(second.state->window);
+        check(second.state->layout == korean, "second stream lost Korean layout");
+        sendScan(second.state->window, 0x38, true, true);
+        pump();
+        sendScan(second.state->window, 0x38, true, false);
+        pump();
+        check(second.state->altDown == 1 && second.state->altUp == 1, "second stream raw right Alt failed");
+
+        // The second process handles actual focus loss while the local app gains focus.
+        foreground(local.state->window);
+        check(local.state->layout == korean, "other Windows app lost Korean layout");
+        sendScan(local.state->window, 0x1D, false, true);
+        pump();
+        sendScan(local.state->window, 0x2E, false, true);
+        sendScan(local.state->window, 0x2E, false, false);
+        sendScan(local.state->window, 0x1D, false, false);
+        pump();
+        check(local.state->ctrlDown == 1 && local.state->ctrlUp == 1 && local.state->cDown == 1 && local.state->cUp == 1,
+              "background streams swallowed local Ctrl+C");
+        check(second.state->ctrlDown == 0 && second.state->cDown == 0, "inactive stream received local keys");
+        check(!scope.setActive(stream, true), "background stream activated raw capture");
+        check(GetKeyboardLayout(0) == korean && second.state->layout == korean && local.state->layout == korean,
+              "cross-process focus cycle changed a keyboard layout");
+        check(GetKeyboardLayoutList(0, nullptr) == layoutCount, "raw capture installed an OS layout");
+        foreground(nativeWindow(stream));
+        check(scope.setActive(stream, true), "raw recapture failed");
+        scope.setActive(nullptr, false);
+        check(GetKeyboardLayout(0) == korean, "recapture/escape changed layout");
+        std::cout << "Raw keyboard test passed: Korean right Alt down/up, two stream processes, independent Windows app, foreground isolation, no OS layout changes.\n";
+    } catch (...) {
+        SDL_SetWindowKeyboardGrab(stream, SDL_FALSE);
+        scope.setActive(nullptr, false);
+        ActivateKeyboardLayout(original, 0);
+        throw;
+    }
+    ActivateKeyboardLayout(original, 0);
+}

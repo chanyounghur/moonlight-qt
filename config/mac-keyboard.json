@@ -5,7 +5,7 @@
   "layout": "mac",
   "capsLock": "ctrl-space",
   "blockLocalCapsLock": true,
-  "normalizeKoreanModifiers": true,
+  "rawKeyboard": true,
   "traceModifierKeys": true,
   "traceCapsLock": true
 }

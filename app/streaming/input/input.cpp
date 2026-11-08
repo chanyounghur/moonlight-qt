@@ -315,7 +315,7 @@ void SdlInputHandler::updateKeyboardGrabState()
     bool shouldGrab = m_CaptureSystemKeysMode != StreamingPreferences::CSK_OFF && isCaptureActive();
     if (m_MacKeyboardEnabled) {
         shouldGrab = shouldGrab && !m_MacKeyboardReleased &&
-                     (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS);
+                     RawKeyboardScope::hasForeground(m_Window);
     }
     if (shouldGrab) {
         Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
@@ -337,7 +337,7 @@ void SdlInputHandler::updateKeyboardGrabState()
 
     m_KeyboardCaptureActive = shouldGrab;
     if (m_MacKeyboardEnabled) {
-        m_KeyboardLayoutScope.setActive(m_Window, shouldGrab && m_NormalizeKoreanModifiers);
+        m_RawKeyboardScope.setActive(m_Window, shouldGrab && m_RawKeyboard);
         const bool wasActive = m_CapsLockCapture.active();
         m_CapsLockCapture.setActive(m_Window, shouldGrab && m_BlockLocalCapsLock);
         if (m_TraceCapsLock && wasActive != m_CapsLockCapture.active()) {
@@ -356,6 +356,7 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
     if (m_Window == nullptr) {
         return false;
     }
+    if (m_MacKeyboardEnabled && !RawKeyboardScope::hasForeground(m_Window)) return false;
 
     // NB: We used to check SDL_WINDOW_KEYBOARD_GRABBED here, but this isn't
     // always set when capture "fails" on SDL3, even though the user may have

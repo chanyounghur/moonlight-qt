@@ -3,8 +3,10 @@
 #include <SDL_syswm.h>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
-void testKeyboardLayoutScope(SDL_Window* stream, SDL_Window* other);
+void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other);
+int runKeyboardPeer(const char* mode, const char* name);
 
 void check(bool ok, const char* message)
 {
@@ -54,8 +56,10 @@ void sendCaps(SDL_Window* window, bool down)
     check(SendInput(1, &input, sizeof(input)) == 1, "SendInput failed");
 }
 
-int main()
+int main(int argc, char** argv)
 {
+    if (argc == 3 && (std::string(argv[1]) == "--raw-peer" || std::string(argv[1]) == "--local-peer"))
+        return runKeyboardPeer(argv[1], argv[2]);
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) return 1;
     auto* stream = SDL_CreateWindow("Caps Lock capture integration test", 80, 80, 360, 160, SDL_WINDOW_SHOWN);
@@ -93,7 +97,7 @@ int main()
         pump(capture, downs, ups);
         check(capture.localToggleState() == originalToggle, "failed to restore original toggle");
         std::cout << "Native Caps Lock capture test passed: raw down/up, repeat suppression, local toggle isolation.\n";
-        testKeyboardLayoutScope(stream, other);
+        testRawKeyboardScope(stream, other);
     }
     catch (const std::exception& e) {
         std::cerr << "FAIL: " << e.what() << '\n';

@@ -191,7 +191,7 @@ SOURCES += \
     streaming/input/keyboard.cpp \
     streaming/input/mackeyboard.cpp \
     streaming/input/capslockcapture.cpp \
-    streaming/input/keyboardlayoutscope.cpp \
+    streaming/input/rawkeyboardscope.cpp \
     streaming/input/mouse.cpp \
     streaming/input/reltouch.cpp \
     streaming/session.cpp \
@@ -233,7 +233,7 @@ HEADERS += \
     streaming/input/input.h \
     streaming/input/keymapper.h \
     streaming/input/capslockcapture.h \
-    streaming/input/keyboardlayoutscope.h \
+    streaming/input/rawkeyboardscope.h \
     streaming/session.h \
     streaming/audio/renderers/renderer.h \
     streaming/audio/renderers/sdl.h \

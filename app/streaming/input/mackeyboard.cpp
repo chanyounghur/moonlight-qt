@@ -74,14 +74,14 @@ void SdlInputHandler::initializeMacKeyboard()
     }, escapeKey, escapeModifiers, inputSource);
     m_BlockLocalCapsLock = config.value("blockLocalCapsLock").toBool(true);
     m_TraceCapsLock = config.value("traceCapsLock").toBool(false);
-    m_NormalizeKoreanModifiers = config.value("normalizeKoreanModifiers").toBool(true);
+    m_RawKeyboard = config.value("rawKeyboard").toBool(true);
     m_TraceModifierKeys = config.value("traceModifierKeys").toBool(false);
     m_MacKeyboardEnabled = true;
     m_AbsoluteMouseMode = true;
     m_PointerRegionLockActive = false;
     m_PointerRegionLockToggledByUser = true;
     m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard layout v4; CapsLock %s; free mouse; escape: %s",
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard layout v5; CapsLock %s; free mouse; escape: %s",
                 capsLockMode.toUtf8().constData(),
                 config.value("escape").toString().toUtf8().constData());
 #endif
