@@ -10,7 +10,7 @@ constexpr const char* hints[] = {
     "SDL_WINDOWS_RAW_KEYBOARD", "SDL_WINDOWS_RAW_KEYBOARD_INPUTSINK",
     "SDL_WINDOWS_RAW_KEYBOARD_EXCLUDE_HOTKEYS"
 };
-constexpr const char* values[] = {"1", "0", "1"};
+constexpr const char* values[] = {"1", "0", "0"};
 }
 
 struct RawKeyboardScope::Impl {
