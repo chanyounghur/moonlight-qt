@@ -93,6 +93,7 @@ public:
     void setWindow(SDL_Window* window);
 
     void handleKeyEvent(SDL_KeyboardEvent* event);
+    void handleMacKeyboardEvent(SDL_UserEvent* event);
 
     void handleMouseButtonEvent(SDL_MouseButtonEvent* event);
 

@@ -1,5 +1,6 @@
 #include "capslockcapture.h"
 #include <QtGlobal>
+#include <cstdint>
 
 #ifdef Q_OS_WIN
 #include <SDL_syswm.h>
@@ -38,13 +39,14 @@ struct CapsLockCapture::Impl {
         }
 
         SDL_Event event{};
-        event.type = pressed ? SDL_KEYDOWN : SDL_KEYUP;
-        event.key.timestamp = SDL_GetTicks();
-        event.key.windowID = SDL_GetWindowID(self.window);
-        event.key.state = pressed ? SDL_PRESSED : SDL_RELEASED;
-        event.key.keysym.scancode = SDL_SCANCODE_CAPSLOCK;
-        event.key.keysym.sym = SDLK_CAPSLOCK;
-        event.key.keysym.unused = self.generation;
+        // SDL2-compat converts keyboard events through SDL3 and does not retain
+        // keysym.unused. A user event preserves the capture generation intact.
+        event.type = SDL_USEREVENT;
+        event.user.timestamp = SDL_GetTicks();
+        event.user.windowID = SDL_GetWindowID(self.window);
+        event.user.code = CapsLockCapture::EventCode;
+        event.user.data1 = reinterpret_cast<void*>(static_cast<uintptr_t>(self.generation));
+        event.user.data2 = reinterpret_cast<void*>(static_cast<uintptr_t>(pressed));
         // Queue only: no network I/O or logging inside the low-level hook.
         if (SDL_PushEvent(&event) != 1) {
             self.ignoreHeld = pressed;
@@ -111,6 +113,28 @@ bool CapsLockCapture::owns(const SDL_KeyboardEvent& event) const
     return active() && event.keysym.unused == m_Impl->generation;
 #else
     Q_UNUSED(event);
+    return false;
+#endif
+}
+
+bool CapsLockCapture::translate(const SDL_UserEvent& source, SDL_KeyboardEvent& target) const
+{
+#ifdef Q_OS_WIN
+    if (!active() || source.code != EventCode ||
+        reinterpret_cast<uintptr_t>(source.data1) != m_Impl->generation) return false;
+    target = {};
+    const bool down = reinterpret_cast<uintptr_t>(source.data2) != 0;
+    target.type = down ? SDL_KEYDOWN : SDL_KEYUP;
+    target.state = down ? SDL_PRESSED : SDL_RELEASED;
+    target.timestamp = source.timestamp;
+    target.windowID = source.windowID;
+    target.keysym.scancode = SDL_SCANCODE_CAPSLOCK;
+    target.keysym.sym = SDLK_CAPSLOCK;
+    target.keysym.unused = m_Impl->generation;
+    return true;
+#else
+    Q_UNUSED(source);
+    Q_UNUSED(target);
     return false;
 #endif
 }

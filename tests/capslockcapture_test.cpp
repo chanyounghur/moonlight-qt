@@ -23,9 +23,10 @@ void pump(CapsLockCapture& capture, int& downs, int& ups)
     do {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && capture.owns(event.key)) {
-                check(event.key.keysym.scancode == SDL_SCANCODE_CAPSLOCK, "unexpected captured key");
-                if (event.type == SDL_KEYDOWN) ++downs;
+            SDL_KeyboardEvent key{};
+            if (event.type == SDL_USEREVENT && capture.translate(event.user, key)) {
+                check(key.keysym.scancode == SDL_SCANCODE_CAPSLOCK && capture.owns(key), "unexpected captured key");
+                if (key.type == SDL_KEYDOWN) ++downs;
                 else ++ups;
             }
         }

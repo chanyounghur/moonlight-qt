@@ -77,6 +77,12 @@ void SdlInputHandler::initializeMacKeyboard()
 #endif
 }
 
+void SdlInputHandler::handleMacKeyboardEvent(SDL_UserEvent* event)
+{
+    SDL_KeyboardEvent key{};
+    if (m_CapsLockCapture.translate(*event, key)) handleKeyEvent(&key);
+}
+
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 {
     if (!m_MacKeyboardEnabled) {
