@@ -1,5 +1,6 @@
 #define SDL_MAIN_HANDLED
 #include "streaming/input/capslockcapture.h"
+#include "streaming/input/rawkeyboardscope.h"
 #include <SDL_syswm.h>
 #include <iostream>
 #include <stdexcept>
@@ -65,12 +66,14 @@ int main(int argc, char** argv)
     auto* stream = SDL_CreateWindow("Caps Lock capture integration test", 80, 80, 360, 160, SDL_WINDOW_SHOWN);
     auto* other = SDL_CreateWindow("Local window", 480, 80, 360, 160, SDL_WINDOW_SHOWN);
     CapsLockCapture capture;
+    RawKeyboardScope raw;
     int downs = 0, ups = 0;
     int status = 0;
     const int originalToggle = GetKeyState(VK_CAPITAL) & 1;
     try {
         check(stream && other, "SDL test windows unavailable");
         focus(stream, capture, downs, ups);
+        check(raw.setActive(stream, true), "raw input unavailable for Caps Lock test");
         SDL_SetWindowKeyboardGrab(stream, SDL_TRUE);
         check(capture.setActive(stream, true), "hook installation failed");
         sendCaps(stream, true);
@@ -84,6 +87,7 @@ int main(int argc, char** argv)
         // The hook must pass Caps Lock through when another window is foreground,
         // even before Moonlight's focus-lost event removes the hook.
         SDL_SetWindowKeyboardGrab(stream, SDL_FALSE);
+        raw.setActive(nullptr, false);
         focus(other, capture, downs, ups);
         sendCaps(other, true);
         sendCaps(other, false);
@@ -104,6 +108,7 @@ int main(int argc, char** argv)
         status = 1;
     }
     capture.setActive(nullptr, false);
+    raw.setActive(nullptr, false);
     SDL_DestroyWindow(other);
     SDL_DestroyWindow(stream);
     SDL_Quit();
