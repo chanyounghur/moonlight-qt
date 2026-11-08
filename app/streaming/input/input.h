@@ -6,6 +6,7 @@
 #include "SDL_compat.h"
 #include "keymapper.h"
 #include "capslockcapture.h"
+#include "keyboardlayoutscope.h"
 
 struct GamepadState {
     SDL_GameController* controller;
@@ -165,6 +166,9 @@ private:
     bool m_MacKeyboardReleased = false;
     bool m_BlockLocalCapsLock = true;
     bool m_TraceCapsLock = false;
+    bool m_NormalizeKoreanModifiers = true;
+    bool m_TraceModifierKeys = false;
+    KeyboardLayoutScope m_KeyboardLayoutScope;
     CapsLockCapture m_CapsLockCapture;
     macinput::KeyMapper m_MacKeyMapper;
     QSet<int> m_MacMouseButtonsDown;

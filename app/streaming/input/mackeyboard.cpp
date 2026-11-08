@@ -64,9 +64,13 @@ void SdlInputHandler::initializeMacKeyboard()
     m_MacKeyMapper.configure(modifierKeys, {
         {SDL_SCANCODE_LALT, SDL_SCANCODE_LGUI}, {SDL_SCANCODE_RALT, SDL_SCANCODE_RGUI},
         {SDL_SCANCODE_LGUI, SDL_SCANCODE_LALT}, {SDL_SCANCODE_RGUI, SDL_SCANCODE_RALT},
+        // This keyboard's Super key emits Application/Menu, not Windows.
+        {SDL_SCANCODE_APPLICATION, SDL_SCANCODE_RGUI},
     }, escapeKey, escapeModifiers);
     m_BlockLocalCapsLock = config.value("blockLocalCapsLock").toBool(true);
     m_TraceCapsLock = config.value("traceCapsLock").toBool(false);
+    m_NormalizeKoreanModifiers = config.value("normalizeKoreanModifiers").toBool(true);
+    m_TraceModifierKeys = config.value("traceModifierKeys").toBool(false);
     m_MacKeyboardEnabled = true;
     m_AbsoluteMouseMode = true;
     m_PointerRegionLockActive = false;
@@ -90,6 +94,15 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
     if (event->repeat || !isSystemKeyCaptureActive()) return;
+
+    if (m_TraceModifierKeys && (event->keysym.scancode == SDL_SCANCODE_RALT ||
+                               event->keysym.scancode == SDL_SCANCODE_APPLICATION ||
+                               event->keysym.scancode == SDL_SCANCODE_LANG1 ||
+                               event->keysym.scancode == SDL_SCANCODE_UNKNOWN)) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac modifier RX %s; scancode=%d; name=%s",
+                    event->state == SDL_PRESSED ? "down" : "up", event->keysym.scancode,
+                    SDL_GetScancodeName(event->keysym.scancode));
+    }
 
     if (event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
         // Raw input or queued events from an earlier capture must not duplicate

@@ -337,6 +337,7 @@ void SdlInputHandler::updateKeyboardGrabState()
 
     m_KeyboardCaptureActive = shouldGrab;
     if (m_MacKeyboardEnabled) {
+        m_KeyboardLayoutScope.setActive(m_Window, shouldGrab && m_NormalizeKoreanModifiers);
         const bool wasActive = m_CapsLockCapture.active();
         m_CapsLockCapture.setActive(m_Window, shouldGrab && m_BlockLocalCapsLock);
         if (m_TraceCapsLock && wasActive != m_CapsLockCapture.active()) {

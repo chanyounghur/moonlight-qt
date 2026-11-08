@@ -44,7 +44,7 @@ jobs:
           add-tools-to-path: false
           tools: tools_qtcreator_gui
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-      - name: Test native Caps Lock isolation
+      - name: Test native Caps Lock and Korean modifier isolation
         shell: cmd
         env:
           QT_PATH: ${{ runner.workspace }}\Qt\6.12.0\msvc2022_64\bin
@@ -63,9 +63,12 @@ jobs:
         run: |
           Copy-Item config/mac-keyboard.json build/deploy-x64-release/mac-keyboard.json
           Copy-Item docs/MAC-KEYBOARD.md build/deploy-x64-release/MAC-KEYBOARD.md
-          New-Item -ItemType File -Force build/deploy-x64-release/portable.dat | Out-Null
+          # Reuse the installed client's settings and pairing certificates.
+          if (Test-Path build/deploy-x64-release/portable.dat) {
+            Remove-Item -LiteralPath build/deploy-x64-release/portable.dat
+          }
           git rev-parse HEAD | Out-File build/deploy-x64-release/source-commit.txt -Encoding utf8
-      - name: Upload portable build
+      - name: Upload build using existing settings
         uses: actions/upload-artifact@v6
         with:
           name: Moonlight-MacKeyboard-Windows-x64-${{ github.run_number }}

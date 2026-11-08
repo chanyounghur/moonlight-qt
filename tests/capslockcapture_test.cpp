@@ -4,6 +4,8 @@
 #include <iostream>
 #include <stdexcept>
 
+void testKeyboardLayoutScope(SDL_Window* stream, SDL_Window* other);
+
 void check(bool ok, const char* message)
 {
     if (!ok) throw std::runtime_error(message);
@@ -91,6 +93,7 @@ int main()
         pump(capture, downs, ups);
         check(capture.localToggleState() == originalToggle, "failed to restore original toggle");
         std::cout << "Native Caps Lock capture test passed: raw down/up, repeat suppression, local toggle isolation.\n";
+        testKeyboardLayoutScope(stream, other);
     }
     catch (const std::exception& e) {
         std::cerr << "FAIL: " << e.what() << '\n';

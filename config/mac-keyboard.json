@@ -5,5 +5,7 @@
   "layout": "mac",
   "capsLock": "passthrough",
   "blockLocalCapsLock": true,
+  "normalizeKoreanModifiers": true,
+  "traceModifierKeys": true,
   "traceCapsLock": true
 }

@@ -4,7 +4,7 @@
 #include <random>
 
 using namespace macinput;
-enum Key { A = 4, C = 6, Q = 20, Z = 29, Space = 44, Caps = 57, Tab = 43,
+enum Key { A = 4, C = 6, Q = 20, Z = 29, Space = 44, Caps = 57, Tab = 43, Application = 101,
            Ctrl = 224, ShiftKey = 225, AltKey = 226, Win = 227,
            RightCtrl = 228, RightShift = 229, RightAlt = 230, RightWin = 231 };
 
@@ -18,7 +18,8 @@ KeyMapper mapper()
     KeyMapper result;
     result.configure({{Ctrl, Control}, {RightCtrl, Control}, {ShiftKey, Shift}, {RightShift, Shift},
                       {AltKey, Alt}, {RightAlt, Alt}, {Win, Meta}, {RightWin, Meta}},
-                     {{AltKey, Win}, {Win, AltKey}, {RightAlt, RightWin}, {RightWin, RightAlt}},
+                     {{AltKey, Win}, {Win, AltKey}, {RightAlt, RightWin}, {RightWin, RightAlt},
+                      {Application, RightWin}},
                      Z, Control | Alt | Shift);
     return result;
 }
@@ -36,6 +37,19 @@ void expect(const Result& result, std::initializer_list<std::pair<int, bool>> ex
 
 int main()
 {
+    {
+        auto m = mapper();
+        expect(m.process(Application, true), {{RightWin, true}});
+        auto event = m.process(C, true);
+        check(event.events[0].modifiers == Meta, "Super/Menu contributes Command modifier flags");
+        expect(m.process(C, false), {{C, false}});
+        expect(m.process(RightAlt, true), {}); // Two physical keys share Command.
+        expect(m.process(Application, false), {});
+        event = m.process(Space, true);
+        check(event.events[0].modifiers == Meta, "Command remains held by right Alt");
+        expect(m.process(RightAlt, false), {{RightWin, false}});
+        expect(m.process(Space, false), {{Space, false}});
+    }
     {
         auto m = mapper();
         expect(m.process(Caps, true), {{Caps, true}}); // Never synthesize Ctrl+Space.
@@ -108,7 +122,7 @@ int main()
     {
         std::mt19937 random(20261108);
         const int keys[] = {A, Caps, Space, Tab, Ctrl, RightCtrl, AltKey, RightAlt,
-                            ShiftKey, RightShift, Win, RightWin};
+                            ShiftKey, RightShift, Win, RightWin, Application};
         for (int scenario = 0; scenario < 1000; ++scenario) {
             auto m = mapper();
             std::set<int> host;
@@ -119,7 +133,7 @@ int main()
                 }
             };
             for (int step = 0; step < 100; ++step)
-                replay(m.process(keys[random() % 12], (random() % 2) != 0));
+                replay(m.process(keys[random() % (sizeof(keys) / sizeof(keys[0]))], (random() % 2) != 0));
             for (int key : keys) replay(m.process(key, false));
             check(host.empty(), "all physical releases leave host empty");
         }
