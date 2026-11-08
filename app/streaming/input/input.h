@@ -162,6 +162,7 @@ private:
     bool m_MacKeyboardEnabled = false;
     bool m_MacKeyboardReleased = false;
     macinput::KeyMapper m_MacKeyMapper;
+    QSet<int> m_MacMouseButtonsDown;
 
     enum KeyCombo {
         KeyComboQuit,

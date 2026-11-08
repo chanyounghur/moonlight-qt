@@ -369,6 +369,15 @@ void SdlInputHandler::setCaptureActive(bool active)
 {
     // Decoder recreation must not undo an explicit keyboard release.
     if (m_MacKeyboardEnabled && active && m_MacKeyboardReleased) return;
+    if (m_MacKeyboardEnabled && !active) {
+        // The eventual physical button-up may be delivered to another window.
+        for (int button : std::as_const(m_MacMouseButtonsDown)) {
+            LiSendMouseButtonEvent(BUTTON_ACTION_RELEASE, button);
+        }
+        m_MacMouseButtonsDown.clear();
+        m_PendingMouseButtonsAllUpOnVideoRegionLeave = false;
+        SDL_CaptureMouse(SDL_FALSE);
+    }
     if (active) {
         // If we're in relative mode, try to activate SDL's relative mouse mode
         if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {

@@ -85,6 +85,11 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
             button = BUTTON_RIGHT;
     }
 
+    if (m_MacKeyboardEnabled) {
+        if (event->state == SDL_PRESSED) m_MacMouseButtonsDown.insert(button);
+        else m_MacMouseButtonsDown.remove(button);
+    }
+
     LiSendMouseButtonEvent(event->state == SDL_PRESSED ?
                                BUTTON_ACTION_PRESS :
                                BUTTON_ACTION_RELEASE,
