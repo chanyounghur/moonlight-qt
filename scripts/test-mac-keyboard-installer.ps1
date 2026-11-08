@@ -37,6 +37,13 @@ function Verify-Installed([string]$stage) {
 Invoke-WebRequest 'https://github.com/moonlight-stream/moonlight-qt/releases/download/v6.2.0/MoonlightSetup-6.2.0.exe' -OutFile $official
 if ((Get-FileHash $official).Hash -ne 'EE2A1B56EC83010F4F8A275BB71892A7DC7A3BC874DFAEBE706B74D5D10831BD') { throw 'Official fixture checksum mismatch' }
 Invoke-Package $official '/install' 'official-install'
+# Reproduce this user's official MSI plus manually copied v4 profile/documents.
+foreach ($name in @('mac-keyboard.json','source-commit.txt','MAC-KEYBOARD.md','START-HERE.txt')) {
+    $oldFile = Join-Path $installDir $name
+    Set-Content -LiteralPath $oldFile -Value '{"version":2,"enabled":true,"normalizeKoreanModifiers":true,"capsLock":"ctrl-space"}'
+    $item = Get-Item -LiteralPath $oldFile
+    $item.LastWriteTimeUtc = $item.CreationTimeUtc.AddMinutes(2)
+}
 New-Item -Path $settingsKey -Force | Out-Null
 $sentinel = [guid]::NewGuid().ToString()
 New-ItemProperty -Path $settingsKey -Name 'installer-test-pairing-sentinel' -Value $sentinel -PropertyType String -Force | Out-Null
@@ -45,7 +52,7 @@ Verify-Installed 'Upgrade'
 if ((Get-ItemPropertyValue -Path $settingsKey -Name 'installer-test-pairing-sentinel') -ne $sentinel) {
     throw 'Existing user settings were lost during upgrade'
 }
-Write-Output 'Installer upgrade test passed: official 6.2.0 replaced, existing settings preserved, profile included, installed executable starts.'
+Write-Output 'Installer upgrade test passed: official 6.2.0 replaced, manually copied v4 profile replaced, existing settings preserved, installed executable starts.'
 Invoke-Package $setup '/uninstall' 'uninstall-custom'
 if (Test-Path (Join-Path $installDir 'Moonlight.exe')) { throw 'Custom uninstall left the executable installed' }
 Invoke-Package $setup '/install' 'clean-install-custom'

@@ -105,11 +105,26 @@
                                   IgnoreFailure="yes"
                                   Name="$(var.FullName)" />
         </File>
+        <?ifdef var.MacKeyboardBuild ?>
+        <!-- Replace earlier manually copied profiles along with the executable,
+             rather than preserving them as modified, unversioned user files. -->
+        <File Id="MacKeyboardProfile" Source="$(var.DeployDir)\mac-keyboard.json" CompanionFile="MoonlightExe" />
+        <File Id="MacKeyboardSourceCommit" Source="$(var.DeployDir)\source-commit.txt" CompanionFile="MoonlightExe" />
+        <File Id="MacKeyboardDocumentation" Source="$(var.DeployDir)\MAC-KEYBOARD.md" CompanionFile="MoonlightExe" />
+        <File Id="MacKeyboardStartHere" Source="$(var.DeployDir)\START-HERE.txt" CompanionFile="MoonlightExe" />
+        <?endif?>
       </Component>
     </DirectoryRef>
 
     <ComponentGroup Id="MoonlightDependencies" Directory="INSTALLFOLDER">
-      <Files Include="$(var.DeployDir)\**" />
+      <Files Include="$(var.DeployDir)\**">
+        <?ifdef var.MacKeyboardBuild ?>
+        <Exclude Files="$(var.DeployDir)\mac-keyboard.json" />
+        <Exclude Files="$(var.DeployDir)\source-commit.txt" />
+        <Exclude Files="$(var.DeployDir)\MAC-KEYBOARD.md" />
+        <Exclude Files="$(var.DeployDir)\START-HERE.txt" />
+        <?endif?>
+      </Files>
     </ComponentGroup>
 
     <Feature Id="ProductFeature" Title="Moonlight" Level="1" ConfigurableDirectory="INSTALLFOLDER">
