@@ -4,7 +4,7 @@ on:
   push:
     branches: [feature/mac-keyboard]
   pull_request:
-    branches: [master]
+    branches: [feature/mac-keyboard]
   workflow_dispatch:
 
 permissions:
