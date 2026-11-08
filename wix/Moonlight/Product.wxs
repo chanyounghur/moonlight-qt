@@ -1,5 +1,11 @@
 ﻿<?define ShortName = "Moonlight" ?>
+<?ifdef var.MacKeyboardBuild ?>
+<?define FullName = "Moonlight Game Streaming Client (Mac Keyboard)" ?>
+<?define PackageVersion = "6.2.0.$(var.MacKeyboardBuild)" ?>
+<?else?>
 <?define FullName = "Moonlight Game Streaming Client" ?>
+<?define PackageVersion = "!(bind.fileVersion.MoonlightExe)" ?>
+<?endif?>
 
 <?define ShortcutName = "$(var.ShortName)" ?>
 <?define ShortcutDesc = "Stream games and other applications from another PC" ?>
@@ -9,10 +15,16 @@
 
   <Package Name="$(var.FullName)"
            Language="1033"
-           Version="!(bind.fileVersion.MoonlightExe)"
+           Version="$(var.PackageVersion)"
            Manufacturer="Moonlight Game Streaming Project"
            UpgradeCode="5c09f94e-f809-4c6a-9b7b-597c99f041fe">
+    <?ifdef var.MacKeyboardBuild ?>
+    <!-- MSI compares only the first 3 version fields. Allow replacing the
+         official 6.2.0 MSI; Burn compares the full build version on upgrades. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of [ProductName] is already installed." Schedule="afterInstallInitialize" />
+    <?else?>
     <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." Schedule="afterInstallInitialize" />
+    <?endif?>
     <MediaTemplate CompressionLevel="high" EmbedCab="yes" />
 
     <Property Id="APPDATAFOLDER" Value="%LOCALAPPDATA%\Moonlight Game Streaming Project" />

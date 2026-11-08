@@ -27,8 +27,10 @@ jobs:
   windows:
     needs: test
     runs-on: windows-2025
+    timeout-minutes: 30
     env:
       CI_VERSION: mac-keyboard-${{ github.run_number }}
+      MAC_KEYBOARD_BUILD: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -44,7 +46,7 @@ jobs:
           add-tools-to-path: false
           tools: tools_qtcreator_gui
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-      - name: Test native Caps Lock and Korean modifier isolation
+      - name: Test native Caps Lock and cross-process raw keyboard isolation
         shell: cmd
         env:
           QT_PATH: ${{ runner.workspace }}\Qt\6.12.0\msvc2022_64\bin
@@ -58,21 +60,26 @@ jobs:
         run: |
           set "PATH=%QT_PATH%;%PATH%"
           scripts\build-arch.bat Release x64
-      - name: Package Mac keyboard profile
+      - name: Build x64 setup with runtime prerequisites
+        shell: cmd
+        run: scripts\build-mac-keyboard-setup.bat
+      - name: Test official upgrade and clean installation
         shell: pwsh
-        run: |
-          Copy-Item config/mac-keyboard.json build/deploy-x64-release/mac-keyboard.json
-          Copy-Item docs/MAC-KEYBOARD.md build/deploy-x64-release/MAC-KEYBOARD.md
-          Copy-Item docs/MAC-KEYBOARD-START.txt build/deploy-x64-release/START-HERE.txt
-          # Reuse the installed client's settings and pairing certificates.
-          if (Test-Path build/deploy-x64-release/portable.dat) {
-            Remove-Item -LiteralPath build/deploy-x64-release/portable.dat
-          }
-          git rev-parse HEAD | Out-File build/deploy-x64-release/source-commit.txt -Encoding utf8
-      - name: Upload build using existing settings
+        run: ./scripts/test-mac-keyboard-installer.ps1
+      - name: Upload installer
         uses: actions/upload-artifact@v6
         with:
-          name: Moonlight-MacKeyboard-Windows-x64-${{ github.run_number }}
-          path: build/deploy-x64-release/*
+          name: Moonlight-MacKeyboard-Installer-x64-${{ github.run_number }}
+          path: |
+            build/installer-x64-release/Moonlight-MacKeyboard-v5-x64-Setup.exe
+            build/deploy-x64-release/source-commit.txt
+            build/deploy-x64-release/MAC-KEYBOARD.md
           if-no-files-found: error
           retention-days: 30
+      - name: Upload installer diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: Installer-diagnostics-${{ github.run_number }}
+          path: build/installer-tests/*.log
+          if-no-files-found: ignore

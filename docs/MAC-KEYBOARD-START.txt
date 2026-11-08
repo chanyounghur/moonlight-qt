@@ -1,26 +1,19 @@
-Moonlight Mac Keyboard v4 — Caps Lock으로 한영 전환
+Moonlight Mac Keyboard v5 — Windows 한영키 영향 수정
 
-1. 기존 Moonlight를 종료합니다.
-2. ZIP 전체를 새 폴더에 압축 해제하고 Moonlight.exe를 실행합니다.
-3. 기존 Mac 등록·페어링 정보를 그대로 사용합니다.
-   portable.dat를 추가하지 마세요. mac-keyboard.json은 실행 파일 옆에 두세요.
+기존 Moonlight를 미리 제거하지 마세요.
+모든 Moonlight 창을 종료하고 Setup.exe로 업데이트한 뒤 기존 아이콘으로 실행합니다.
+연결·페어링 정보는 유지합니다. 설정 파일과 필요한 런타임은 설치 프로그램이 준비합니다.
 
-Caps Lock은 Mac에 Control+Space를 한 번 보냅니다.
-Mac의 입력 소스 전환 단축키가 Control+Space여야 합니다.
-길게 눌러도 한 번만 전환하며, 다른 키를 누르고 있으면 그 키를 뗀 직후 전환합니다.
-대기 중 창 밖으로 나가거나 탈출하면 전환을 취소합니다.
-Caps Lock 길게 누르기로 대문자 고정을 켜는 동작은 이 모드에서 제공하지 않습니다.
-
-원형 전달로 복원: mac-keyboard.json에서 "capsLock": "passthrough"로 바꾸고 재접속.
-마우스 자유 이동, Alt → Command, Windows → Option, Super(Menu) → 오른쪽 Command,
-Ctrl+Alt+Shift+Z 탈출키는 유지됩니다. Sunshine은 바꿀 필요 없습니다.
+이번 변경은 Windows 배열 전환 코드를 제거하고 Raw Input을 사용하는 것입니다.
+이전 버전 때문에 입력기가 꼬여 있으면 Windows 앱에서 Win+Space로 한국어를 한 번 다시 선택하세요.
 
 확인할 것
-- Caps Lock을 한 번 눌렀을 때 Mac 입력 소스와 실제 한글/영문 입력이 바뀌는지
-- 길게 눌러도 한 번만 전환되고, 이후 일반 글자가 정상 입력되는지
-- Windows로 돌아온 뒤 Caps Lock 상태가 접속 전과 같은지
+- Moonlight 안: 오른쪽 Alt+Space 및 Caps Lock 한영 전환
+- 다른 Windows 창: 한영키가 바로 동작하는지
+- Moonlight 두 개를 번갈아 사용한 뒤에도 Windows 한영키가 유지되는지
 
+Caps Lock → Control+Space, Alt → Command, Windows → Option,
+Super(Menu) → 오른쪽 Command, 마우스 자유 이동은 유지됩니다.
+탈출: Ctrl+Alt+Shift+Z
 상세 설명: MAC-KEYBOARD.md
-소스 커밋: source-commit.txt
-진단 로그: %TEMP%의 최신 Moonlight-*.log
-소스: https://github.com/chanyounghur/moonlight-qt/tree/feature/mac-keyboard
+빌드 소스: source-commit.txt

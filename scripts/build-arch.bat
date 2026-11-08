@@ -292,6 +292,18 @@ if "%ML_SYMBOL_STORE%" NEQ "" (
     if !ERRORLEVEL! NEQ 0 goto Error
 )
 
+rem Include the profile BEFORE WiX harvests the deployment directory.
+if defined MAC_KEYBOARD_BUILD (
+    copy "%SOURCE_ROOT%\config\mac-keyboard.json" "%DEPLOY_FOLDER%\mac-keyboard.json"
+    if !ERRORLEVEL! NEQ 0 goto Error
+    copy "%SOURCE_ROOT%\docs\MAC-KEYBOARD.md" "%DEPLOY_FOLDER%\MAC-KEYBOARD.md"
+    if !ERRORLEVEL! NEQ 0 goto Error
+    copy "%SOURCE_ROOT%\docs\MAC-KEYBOARD-START.txt" "%DEPLOY_FOLDER%\START-HERE.txt"
+    if !ERRORLEVEL! NEQ 0 goto Error
+    git rev-parse HEAD > "%DEPLOY_FOLDER%\source-commit.txt"
+    if !ERRORLEVEL! NEQ 0 goto Error
+)
+
 echo Building MSI
 cmd /c "set VERSION= && msbuild -Restore %SOURCE_ROOT%\wix\Moonlight\Moonlight.wixproj /p:Configuration=%BUILD_CONFIG% /p:Platform=%ARCH% /p:MSBuildProjectExtensionsPath=%BUILD_FOLDER%\"
 if !ERRORLEVEL! NEQ 0 goto Error

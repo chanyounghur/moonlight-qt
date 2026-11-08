@@ -12,6 +12,9 @@
   <PropertyGroup>
     <AcceptEula>wix7</AcceptEula>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(MAC_KEYBOARD_BUILD)' != ''">
+    <DefineConstants>$(DefineConstants);MacKeyboardBuild=$(MAC_KEYBOARD_BUILD)</DefineConstants>
+  </PropertyGroup>
   <PropertyGroup Condition="$(SIGN)!=''">
     <SignOutput>true</SignOutput>
   </PropertyGroup>

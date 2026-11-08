@@ -11,7 +11,12 @@
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal" xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
-  <Bundle Name="Moonlight Game Streaming Client"
+  <?ifdef var.MacKeyboardBuild ?>
+  <?define BundleName = "Moonlight Game Streaming Client (Mac Keyboard)" ?>
+  <?else?>
+  <?define BundleName = "Moonlight Game Streaming Client" ?>
+  <?endif?>
+  <Bundle Name="$(var.BundleName)"
           Version="!(bind.PackageVersion.Moonlight_x64)"
           Manufacturer="Moonlight Game Streaming Project"
           UpgradeCode="466fa35d-4be4-40ef-9ce5-afadc3b63bc5"
@@ -21,7 +26,11 @@
           IconSourceFile="..\..\app\moonlight.ico">
 
     <bal:Condition Message="This version of Moonlight requires Windows 10 or later." Condition="VersionNT &gt;= v10.0" />
+    <?ifdef var.MacKeyboardBuild ?>
+    <bal:Condition Message="This Mac Keyboard build requires x64 Windows." Condition="NativeMachine = 34404" />
+    <?else?>
     <bal:Condition Message="This version of Moonlight requires a 64-bit version of Windows." Condition="NativeMachine &lt;&gt; 332" />
+    <?endif?>
 
     <Variable Name="InstallFolder" Type="formatted" Value="[ProgramFiles6432Folder]Moonlight Game Streaming" />
 
@@ -105,6 +114,7 @@
         <MsiProperty Name="ADDDESKTOPSHORTCUT" Value="[AddDesktopShortcutCheckbox]" />
       </MsiPackage>
 
+      <?ifndef var.MacKeyboardBuild ?>
       <MsiPackage Id="Moonlight_arm64"
                   SourceFile="$(env.BUILD_ROOT)\build-arm64-$(env.BUILD_CONFIG)\Moonlight.msi"
                   Name="Moonlight_arm64.msi"
@@ -113,6 +123,7 @@
         <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
         <MsiProperty Name="ADDDESKTOPSHORTCUT" Value="[AddDesktopShortcutCheckbox]" />
       </MsiPackage>
+      <?endif?>
     </Chain>
 
   </Bundle>
