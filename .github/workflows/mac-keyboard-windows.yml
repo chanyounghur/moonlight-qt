@@ -37,6 +37,9 @@ jobs:
           submodules: recursive
       - name: Download upstream dependencies
         run: ./setup-deps.ps1
+      - name: Test native Caps Lock and cross-process raw keyboard isolation
+        shell: cmd
+        run: scripts\test-windows-input.bat
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
@@ -46,13 +49,6 @@ jobs:
           add-tools-to-path: false
           tools: tools_qtcreator_gui
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@073e34d7c2ab4ae6961ed7cca690b3abd5ba5a7e'
-      - name: Test native Caps Lock and cross-process raw keyboard isolation
-        shell: cmd
-        env:
-          QT_PATH: ${{ runner.workspace }}\Qt\6.12.0\msvc2022_64\bin
-        run: |
-          set "PATH=%QT_PATH%;%PATH%"
-          scripts\test-windows-input.bat
       - name: Build Windows x64
         shell: cmd
         env:

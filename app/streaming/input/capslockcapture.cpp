@@ -1,8 +1,7 @@
 #include "capslockcapture.h"
-#include <QtGlobal>
 #include <cstdint>
 
-#ifdef Q_OS_WIN
+#ifdef _WIN32
 #include <SDL_syswm.h>
 
 struct CapsLockCapture::Impl {
@@ -69,7 +68,7 @@ CapsLockCapture::~CapsLockCapture() { setActive(nullptr, false); }
 
 bool CapsLockCapture::setActive(SDL_Window* window, bool active)
 {
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     auto& self = *m_Impl;
     if (!active) {
         if (self.hook) UnhookWindowsHookEx(self.hook);
@@ -93,14 +92,14 @@ bool CapsLockCapture::setActive(SDL_Window* window, bool active)
     }
     return true;
 #else
-    Q_UNUSED(window);
+    (void)window;
     return !active;
 #endif
 }
 
 bool CapsLockCapture::active() const
 {
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     return m_Impl->hook != nullptr;
 #else
     return false;
@@ -109,17 +108,17 @@ bool CapsLockCapture::active() const
 
 bool CapsLockCapture::owns(const SDL_KeyboardEvent& event) const
 {
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     return active() && event.keysym.unused == m_Impl->generation;
 #else
-    Q_UNUSED(event);
+    (void)event;
     return false;
 #endif
 }
 
 bool CapsLockCapture::translate(const SDL_UserEvent& source, SDL_KeyboardEvent& target) const
 {
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     if (!active() || source.code != EventCode ||
         reinterpret_cast<uintptr_t>(source.data1) != m_Impl->generation) return false;
     target = {};
@@ -133,15 +132,15 @@ bool CapsLockCapture::translate(const SDL_UserEvent& source, SDL_KeyboardEvent& 
     target.keysym.unused = m_Impl->generation;
     return true;
 #else
-    Q_UNUSED(source);
-    Q_UNUSED(target);
+    (void)source;
+    (void)target;
     return false;
 #endif
 }
 
 int CapsLockCapture::localToggleState() const
 {
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     return GetKeyState(VK_CAPITAL) & 1;
 #else
     return -1;

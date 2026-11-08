@@ -1,8 +1,7 @@
 #include "rawkeyboardscope.h"
-#include <QtGlobal>
 #include <string>
 #include <array>
-#ifdef Q_OS_WIN
+#ifdef _WIN32
 #include <SDL_syswm.h>
 #endif
 
@@ -26,7 +25,7 @@ RawKeyboardScope::~RawKeyboardScope() { setActive(nullptr, false); }
 bool RawKeyboardScope::hasForeground(SDL_Window* window)
 {
     if (!window || !(SDL_GetWindowFlags(window) & SDL_WINDOW_INPUT_FOCUS)) return false;
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     SDL_SysWMinfo info{};
     SDL_VERSION(&info.version);
     return SDL_GetWindowWMInfo(window, &info) && GetForegroundWindow() == info.info.win.window;
@@ -53,7 +52,7 @@ bool RawKeyboardScope::setActive(SDL_Window* window, bool active)
     }
     if (!hasForeground(window)) return false;
     if (self.active) return true;
-#ifdef Q_OS_WIN
+#ifdef _WIN32
     SDL_version version;
     SDL_GetVersion(&version);
     if (!(version.major == 2 && version.minor >= 30 && version.patch >= 50) && !SDL_GetHint("SDL3_VERSION")) {
