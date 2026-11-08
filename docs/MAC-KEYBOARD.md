@@ -1,90 +1,111 @@
-# Windows → Mac 키보드 프로필 (실험 버전)
+# Windows → Mac 키보드 배열 v2 / Caps Lock 관찰 버전
 
-기준: Moonlight Qt v6.2.0. Windows x64 전용 개인용 포크입니다.
-컴파일 및 자동 테스트 통과 여부는 GitHub Actions에서 확인하세요.
-실제 Windows → Mac 스트리밍 입력은 별도 수동 검증이 필요합니다.
+Moonlight Qt v6.2.0 기반 Windows x64 개인용 포크입니다. v1의 개별 단축키
+규칙을 제거하고 키 역할을 바꿉니다. 원격 Mac에서의 실제 동작은 별도 검증 대상입니다.
 
 ## 실행
 
-1. GitHub Actions의 **Mac keyboard - Windows x64** 실행을 엽니다.
-2. 성공한 실행의 `Moonlight-MacKeyboard-Windows-x64-…` 아티팩트를 내려받습니다.
-3. ZIP 전체를 쓰기 가능한 폴더에 풀고 `Moonlight.exe`를 실행합니다.
-4. Mac 호스트와 페어링한 뒤 데스크톱 스트림에 접속합니다.
+1. 기존 Moonlight를 종료합니다.
+2. Actions의 **Mac keyboard - Windows x64**에서 성공한 최신 아티팩트를 받습니다.
+3. 새 폴더에 ZIP 전체를 풀고 `Moonlight.exe`를 실행합니다.
+4. Mac과 페어링하고 데스크톱에 접속합니다.
 
-`portable.dat`가 포함되어 기존 설치와 설정을 분리합니다. 기존 Moonlight는
-종료한 뒤 실행하세요. 이 빌드는 코드 서명되지 않았습니다.
+`portable.dat`로 기존 설치의 설정과 분리됩니다. v1의 `mac-keyboard.json`을
+복사하지 마세요. 설정 버전이 맞지 않으면 프로필을 비활성화하고 로그를 남깁니다.
 
-## 기본 동작
+## 키 역할
 
-| Windows 입력 | 원격 Mac에 보내는 입력 |
+| Windows 키 | Mac으로 보내는 키 |
 | --- | --- |
-| Caps Lock | Control+Space (입력 소스 전환) |
-| Alt+Space | Command+Space (Spotlight) |
-| Alt+Tab | Command+Tab (앱 전환) |
-| Ctrl+Alt+Shift+Z | 로컬 탈출: 키보드 캡처 해제 |
+| 왼쪽/오른쪽 Alt | 왼쪽/오른쪽 Command |
+| 왼쪽/오른쪽 Windows | 왼쪽/오른쪽 Option |
+| Control, Shift, 일반 키 | 그대로 |
+| Caps Lock | **Caps Lock 그대로** (Control+Space를 만들지 않음) |
+| 물리 Ctrl+Alt+Shift+Z | 로컬 탈출: 원격에 Z를 보내지 않고 캡처 해제 |
 
-프로필을 켜면 스트리밍 창에 포커스가 있는 동안 시스템 키보드 캡처를 사용합니다.
-마우스는 절대 좌표 모드로 동작하며 창이나 모니터 안에 가두지 않습니다.
-다른 창을 클릭하면 키보드 캡처와 원격 키 눌림을 해제합니다.
-다시 스트리밍 창에 포커스를 주면 재개합니다. 탈출키를 눌렀다면 스트리밍
-영상 영역을 클릭해서 재개할 수 있습니다. 단순 창 크기 변경은 탈출을 취소하지 않습니다.
+Alt+C, Alt+Space, Alt+Tab 등은 개별 규칙 없이 Mac과 실행 중인 앱이 해석합니다.
+Alt를 누른 동안 Command가 유지되므로 Tab 반복, Shift+Tab 역순 전환도 가능합니다.
+모든 연결에 적용되며 호스트 OS 자동 판별은 하지 않습니다.
 
-몰입 중에는 기존 Moonlight의 Ctrl+Alt+Shift 조합 기능(종료, 최소화, 마우스
-모드 전환 등)을 실행하지 않습니다. 지정한 탈출키를 먼저 사용하세요.
-탈출 후에는 키 입력을 원격으로 보내지 않습니다.
+Moonlight 창에 포커스가 있을 때만 키보드를 캡처합니다. 마우스는 자유롭게
+이동합니다. 다른 창을 클릭하면 캡처와 눌린 키/마우스 버튼을 해제합니다.
+영상 영역을 다시 클릭하거나 창으로 돌아오면 재개합니다. 탈출 후 단순한
+창 크기 변경은 재캡처하지 않습니다. 마우스만 창 밖으로 옮기면 포커스는 유지됩니다.
+기존 Moonlight의 종료·최소화 등 Ctrl+Alt+Shift 단축키는 몰입 중 실행하지 않습니다.
 
-Caps Lock의 Windows 토글 상태/LED는 보존하지 않습니다. Mac의 한국어/영어
-입력 소스와 Control+Space 단축키를 설정하세요. 입력 소스가 3개 이상이면
-Control+Space의 동작은 Mac 설정에 따릅니다. 프로필은 호스트 OS를 자동 판별하지
-않고 이 실행본의 모든 연결에 적용됩니다.
+## 이번 Caps Lock 실험
 
-## 설정 변경
+목표는 Windows의 Caps Lock 토글을 막고, 기존 Moonlight 프로토콜의 Caps Lock
+down/up(`VK 0x14`, 전송 코드 `0x8014`)을 Mac 호스트로 보내 결과를 관찰하는 것입니다.
+현재 Windows 토글 상태를 강제로 켜거나 끄지는 않습니다. 캡처 시작 전에 키가
+눌려 있었다면 먼저 뗀 다음 다시 누르세요.
 
-`Moonlight.exe` 옆의 `mac-keyboard.json`을 수정하고 스트림을 재접속합니다.
-`enabled: false`로 바꾸면 기존 Moonlight 입력 동작으로 돌아갑니다.
+1. 접속 전 Windows 메모장에서 `a`를 입력해 현재 대소문자를 기억합니다.
+2. Mac 메모장/텍스트 편집기에서 Caps Lock을 짧게 한 번 누릅니다.
+3. Mac 입력 소스 표시가 바뀌는지, 실제 입력이 한글/영문으로 바뀌는지 봅니다.
+4. 탈출키 또는 다른 창 클릭 후 Windows에서 다시 `a`를 입력합니다.
+   접속 전과 대소문자가 같은지 봅니다. 키보드 LED는 참고로만 확인합니다.
+5. 짧게 누르기와 길게 누르기를 각각 확인합니다. 길게 누르기 동작은 Mac 설정에 따릅니다.
 
-`from`은 원래 조합, `to`는 원격으로 보낼 조합입니다. `Ctrl`, `Alt`, `Shift`,
-`Command` 또는 `Meta`와 SDL 키 이름(`Space`, `Tab`, `CapsLock`, `F1` 등)을
-`+`로 연결합니다. 한 조합에는 일반 키 하나와 수식 키들을 넣습니다.
-좌우 수식 키 모두 입력 규칙에 매칭되며 출력에는 왼쪽 수식 키를 사용합니다.
-규칙의 수식 키는 정확히 일치해야 합니다. 예를 들어 Shift+Alt+Space는
-Alt+Space 규칙을 적용하지 않습니다. Caps/Num Lock 토글 상태는 매칭에 영향을 주지 않습니다.
-`holdModifiers: true`는 Alt+Tab처럼 원래 수식 키를 누른 동안 출력 수식 키를
-유지하는 옵션입니다. Alt를 누른 채 Tab을 여러 번 눌러 Mac 앱을 순환하고,
-Alt를 떼면 Command를 해제해 선택합니다. 이 동안 다른 키에도 Command가 적용됩니다.
+한영 전환이 안 되어도 즉시 Control+Space로 우회하지 않습니다. 다음 로그와 함께
+Mac의 입력 소스 변경/대문자 상태/아무 반응 없음 중 어떤 결과인지 확인합니다.
+사용자 제공 호스트 버전: `2026.914.233613`. macOS 버전은 미확인입니다.
 
-`escape`에는 수식 키가 포함된 조합이 필요합니다. 탈출 조합은 매핑보다 우선합니다.
-잘못된 설정이면 프로필을 비활성화하고 로그를 남깁니다. 설정 UI, 매크로,
-키 반복 실행, 앱별/호스트별 프로필은 현재 범위에 포함하지 않습니다.
+### 관찰 로그
 
-## 검증 체크리스트
+포터블 폴더의 `Moonlight-*.log`에서 `CapsLock`을 검색합니다.
 
-- 창 모드와 전체 화면에서 한영 전환, Spotlight, 앱 전환이 정상 동작한다.
-- Alt를 먼저 떼기/Space를 먼저 떼기, 빠른 반복 입력 후 키가 남지 않는다.
-- Alt+Space 시 Windows 창 메뉴/로컬 런처가 같이 실행되지 않는다.
-- 마우스가 다른 창과 모니터로 자유롭게 이동한다.
-- 다른 창 클릭, 탈출키, 연결 종료 후 Windows 키보드가 정상 동작한다.
-- 탈출 후 창 크기를 바꿔도 재캡처하지 않고, 영상 클릭 시 재개한다.
-- 키를 누른 채 포커스를 잃거나 재접속해도 원격 키가 남지 않는다.
-- 마우스로 드래그하던 중 탈출하거나 포커스를 잃어도 원격 버튼이 남지 않는다.
-- `enabled: false`로 기존 입력 동작을 복구할 수 있다.
+- `capture on; Windows toggle=0/1`: 로컬 차단 훅 설치와 시작 토글 상태
+- `RX down/up; nativeCapture=1; Windows toggle=...`: 네이티브 훅에서 받은 Caps Lock
+- `TX down/up; VK=0x8014; sendResult=0`: 기존 전송 함수가 이벤트를 접수함
+- `capture off; Windows toggle=...`: 해제 후 로컬 상태
 
-Ctrl+Alt+Del, UAC/잠금 화면 등 Windows 보안 동작은 차단하지 않습니다.
-다른 키보드 훅 프로그램, IME, AltGr 레이아웃과의 조합은 실제 환경에서
-확인해야 합니다. 마우스가 창 밖으로 이동하기만 하면 포커스는 유지되므로
-키보드는 여전히 Mac으로 갑니다. 다른 창을 클릭하면 해제됩니다.
+**TX 성공은 Mac이 받거나 한영 전환을 수행했다는 응답이 아닙니다.** 클라이언트
+전송 단계까지의 증거입니다. RX/TX가 있는데 Mac 반응이 없다면 호스트/macOS 입력
+처리도 조사해야 합니다. `capture install failed`가 있으면 로컬 차단은 실패한 것입니다.
+이 진단은 Caps Lock 이벤트만 기록하고 다른 키나 입력한 문장은 기록하지 않습니다.
 
-## 구조와 업데이트
+## 설정
 
-- `app/streaming/input/keymapper.h`: 외부 라이브러리 없는 키 상태/매핑 엔진.
-- `app/streaming/input/mackeyboard.cpp`: JSON 설정과 SDL 이벤트 어댑터.
-- `input.cpp`, `keyboard.cpp`, `mouse.cpp`, `input.h`, `app.pro`: Moonlight 연결 지점.
-- `tests/keymapper_test.cpp`: 키 해제 순서, 중첩 입력, 탈출, 포커스 초기화,
-  1,000개 무작위 시퀀스에서 중복 down/orphan up/잔류 키 검사.
-- `.github/workflows/mac-keyboard-windows.yml`: 테스트 후 Windows x64 빌드.
+실행 파일 옆 `mac-keyboard.json`을 수정한 뒤 스트림을 재접속합니다.
 
-업데이트는 작업 브랜치에서 공식 릴리스 태그를 병합하고 충돌을 해결한 뒤
-Actions와 위 수동 검증을 거칩니다. 예시의 `<새 태그>`는 실제 릴리스로 바꿉니다.
+```json
+{
+  "version": 2,
+  "enabled": true,
+  "escape": "Ctrl+Alt+Shift+Z",
+  "layout": "mac",
+  "capsLock": "passthrough",
+  "blockLocalCapsLock": true,
+  "traceCapsLock": true
+}
+```
+
+- `enabled: false`: 기존 Moonlight 동작 복구
+- `blockLocalCapsLock: false`: 비교 실험용. 로컬 Caps Lock 차단만 끔
+- `traceCapsLock: false`: Caps Lock 진단 로그 끔
+- `escape`: **물리 Windows 키 기준** 조합. Ctrl/Alt/Shift/Meta와 일반 키 하나 사용
+
+`layout`은 현재 `mac`, `capsLock`은 `passthrough`만 지원합니다. 기존 `mappings`
+필드는 허용하지 않습니다. 단축키 목록이나 Control+Space 우회는 없습니다.
+
+## 검증 및 유지보수
+
+- 일반/좌우 수식 키, 임의 조합, Command 유지, Caps Lock 원형 전달, 탈출,
+  포커스 초기화와 1,000개 무작위 시퀀스는 순수 C++ 자동 테스트로 검사합니다.
+- Windows 네이티브 테스트는 캡처 중 Caps Lock 로컬 토글 차단 및 SDL down/up,
+  다른 창에서의 로컬 토글 복구를 검사합니다. 물리 키보드·원격 Mac 검증은 별도입니다.
+- 실제로 마우스가 자유로운지, 창 전환/드래그/탈출/연결 종료 때 입력이 남지
+  않는지, Windows 단축키가 동시에 실행되지 않는지 확인해야 합니다.
+- Ctrl+Alt+Del, UAC/잠금 화면은 차단하지 않습니다. 다른 키보드 훅·IME·AltGr·
+  키보드 유틸리티와의 조합은 실제 환경에서 확인합니다.
+
+`keymapper.h`는 키 역할 엔진, `mackeyboard.cpp`는 SDL/설정 어댑터,
+`capslockcapture.*`는 Windows의 Caps Lock 전용 캡처입니다. 네이티브 훅 안에서는
+이벤트 큐에만 넣으며 네트워크 전송과 로그는 기존 이벤트 처리 경로에서 수행합니다.
+
+기본 브랜치는 `feature/mac-keyboard`이며 공식 코드 보관용 `master`와 구분합니다.
+새 공식 릴리스는 다음처럼 병합하고 Actions 및 실제 입력을 검증합니다.
 
 ```sh
 git switch feature/mac-keyboard
@@ -93,12 +114,5 @@ git merge <새 태그>
 git push origin feature/mac-keyboard
 ```
 
-포크의 기본 브랜치는 `feature/mac-keyboard`입니다. 공식 코드를 보관하는
-`master`와 구분하며, `master`의 동기화는 별도로 수행합니다.
-Actions 화면의 **Run workflow**로 현재 커스텀 버전을 다시 빌드할 수 있습니다.
-Qt, Windows runner, 사전 빌드 의존성은 공식 릴리스 워크플로와 함께 점검하세요.
-매핑 엔진은 네트워크 API를 호출하지 않으며 전송은 기존 Moonlight 경로를 사용합니다.
-코드가 충돌 없이 합쳐져도 실제 캡처 동작까지 검증된 것은 아닙니다.
-
-초기 수동 검증 대상의 사용자 제공 호스트 버전은 `2026.914.233613`입니다.
-macOS 버전은 아직 확인하지 않았으며 이 조합의 실기 검증은 미완료입니다.
+Actions의 **Run workflow**로 재빌드할 수 있습니다. Qt, runner, 사전 빌드 의존성도
+공식 릴리스에 맞춰 확인합니다. 컴파일 성공과 실제 Mac 호환성은 구분해야 합니다.

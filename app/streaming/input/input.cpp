@@ -336,6 +336,14 @@ void SdlInputHandler::updateKeyboardGrabState()
 #endif
 
     m_KeyboardCaptureActive = shouldGrab;
+    if (m_MacKeyboardEnabled) {
+        const bool wasActive = m_CapsLockCapture.active();
+        m_CapsLockCapture.setActive(m_Window, shouldGrab && m_BlockLocalCapsLock);
+        if (m_TraceCapsLock && wasActive != m_CapsLockCapture.active()) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "CapsLock capture %s; Windows toggle=%d",
+                        m_CapsLockCapture.active() ? "on" : "off", m_CapsLockCapture.localToggleState());
+        }
+    }
 }
 
 bool SdlInputHandler::isSystemKeyCaptureActive()

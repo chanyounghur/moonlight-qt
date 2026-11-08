@@ -1,7 +1,7 @@
 # Moonlight PC
 
 > This fork's `feature/mac-keyboard` branch adds a Windows-to-Mac keyboard
-> profile with a free mouse and a dedicated escape shortcut.
+> layout with a free mouse, raw Caps Lock capture, and a dedicated escape shortcut.
 > [사용법 및 업데이트 방법](docs/MAC-KEYBOARD.md).
 
 [Moonlight PC](https://moonlight-stream.org) is an open source PC client for NVIDIA GameStream and [Sunshine](https://github.com/LizardByte/Sunshine).

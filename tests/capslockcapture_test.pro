@@ -1,0 +1,8 @@
+QT = core
+CONFIG += console c++17
+CONFIG -= app_bundle debug_and_release
+TEMPLATE = app
+TARGET = capslockcapture-test
+SOURCES += $$PWD/capslockcapture_test.cpp $$PWD/../app/streaming/input/capslockcapture.cpp
+INCLUDEPATH += $$PWD/../app $$PWD/../libs/windows/include/x64/SDL2 $$PWD/../libs/windows/include/x64 $$PWD/../libs/windows/include
+LIBS += -L$$PWD/../libs/windows/lib/x64 -lSDL2 user32.lib

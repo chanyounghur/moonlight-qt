@@ -1,7 +1,6 @@
 #pragma once
 
-// Platform-independent key-state engine. Keys are opaque integers supplied by
-// the adapter; no SDL, Qt, Windows, or Moonlight protocol dependency lives here.
+// Key roles, not shortcut recipes. No SDL, Qt, or protocol dependency.
 #include <map>
 #include <set>
 #include <utility>
@@ -9,33 +8,17 @@
 
 namespace macinput {
 enum Modifier : unsigned { Control = 1, Alt = 2, Shift = 4, Meta = 8 };
-
-struct Rule {
-    int trigger;
-    unsigned modifiers;
-    std::vector<int> output;
-    bool holdModifiers = false;
-};
-
-struct KeyEvent {
-    int key;
-    bool down;
-    unsigned modifiers;
-};
-
-struct Result {
-    std::vector<KeyEvent> events;
-    bool releaseCapture = false;
-};
+struct KeyEvent { int key; bool down; unsigned modifiers; };
+struct Result { std::vector<KeyEvent> events; bool releaseCapture = false; };
 
 class KeyMapper {
 public:
-    void configure(std::map<int, unsigned> modifiers, std::vector<Rule> rules,
+    void configure(std::map<int, unsigned> modifiers, std::map<int, int> keyMap,
                    int escapeKey, unsigned escapeModifiers)
     {
         clear();
         m_Modifiers = std::move(modifiers);
-        m_Rules = std::move(rules);
+        m_KeyMap = std::move(keyMap);
         m_EscapeKey = escapeKey;
         m_EscapeModifiers = escapeModifiers;
     }
@@ -44,78 +27,28 @@ public:
     {
         Result result;
         if (down) {
-            if (!m_Physical.insert(key).second) {
-                return result; // Repeat/duplicate down must not retrigger a rule.
-            }
-            const auto mods = modifiersFor(m_Physical);
-            if (key == m_EscapeKey && mods == m_EscapeModifiers) {
+            if (!m_Physical.insert(key).second) return result;
+            // Escape is evaluated on physical keys, before the layout mapping.
+            if (key == m_EscapeKey && modifiersFor(m_Physical) == m_EscapeModifiers) {
                 reconcile({}, result.events);
                 clear();
                 result.releaseCapture = true;
                 return result;
             }
-            for (const auto& rule : m_Rules) {
-                if (rule.trigger == key && rule.modifiers == mods) {
-                    m_Active.emplace(key, rule);
-                    break;
-                }
-            }
         }
-        else {
-            if (m_Physical.erase(key) == 0) {
-                return result; // Includes late ups after a focus change/reset.
-            }
-        }
+        else if (m_Physical.erase(key) == 0) return result;
 
-        const auto physicalModifiers = modifiersFor(m_Physical);
-        for (auto it = m_Active.begin(); it != m_Active.end();) {
-            const auto& rule = it->second;
-            const bool sourceModifiersHeld = rule.modifiers != 0 &&
-                (physicalModifiers & rule.modifiers) == rule.modifiers;
-            if (!m_Physical.count(it->first) && !(rule.holdModifiers && sourceModifiersHeld)) {
-                it = m_Active.erase(it);
-            }
-            else ++it;
-        }
-
-        // Bind a mapping until its trigger is released, even if the user lets
-        // go of Alt first. Shared output keys have set/refcount semantics.
-        unsigned suppressedModifiers = 0;
-        for (const auto& binding : m_Active) {
-            suppressedModifiers |= binding.second.modifiers;
-        }
         std::set<int> desired;
         for (int physical : m_Physical) {
-            if (m_Active.count(physical) == 0 &&
-                !(modifierFor(physical) & suppressedModifiers)) {
-                desired.insert(physical);
-            }
-        }
-        for (const auto& binding : m_Active) {
-            const auto& rule = binding.second;
-            const bool triggerHeld = m_Physical.count(binding.first) != 0;
-            const bool sourceModifiersHeld = rule.modifiers != 0 &&
-                (physicalModifiers & rule.modifiers) == rule.modifiers;
-            for (int output : rule.output) {
-                const bool modifier = modifierFor(output) != 0;
-                // Alt+Tab keeps Command down between Tab taps, then releases it
-                // as soon as Alt is released (even if Tab is still held).
-                if (modifier ? (!rule.holdModifiers || sourceModifiersHeld) : triggerHeld) {
-                    desired.insert(output);
-                }
-            }
+            const auto mapped = m_KeyMap.find(physical);
+            desired.insert(mapped == m_KeyMap.end() ? physical : mapped->second);
         }
         reconcile(desired, result.events);
         return result;
     }
 
     // The adapter releases actual protocol keys on focus loss/disconnect.
-    void clear()
-    {
-        m_Physical.clear();
-        m_Active.clear();
-        m_Emitted.clear();
-    }
+    void clear() { m_Physical.clear(); m_Emitted.clear(); }
 
 private:
     unsigned modifierFor(int key) const
@@ -127,16 +60,13 @@ private:
     unsigned modifiersFor(const std::set<int>& keys) const
     {
         unsigned modifiers = 0;
-        for (int key : keys) {
-            modifiers |= modifierFor(key);
-        }
+        for (int key : keys) modifiers |= modifierFor(key);
         return modifiers;
     }
 
     void reconcile(const std::set<int>& desired, std::vector<KeyEvent>& events)
     {
-        // Release regular keys before modifiers; press modifiers before keys.
-        // In particular, lift the already-forwarded Alt before Command+Space.
+        // Release ordinary keys before modifiers and press modifiers first.
         for (bool modifier : {false, true}) {
             const auto previous = m_Emitted;
             for (int key : previous) {
@@ -156,11 +86,10 @@ private:
     }
 
     std::map<int, unsigned> m_Modifiers;
-    std::vector<Rule> m_Rules;
+    std::map<int, int> m_KeyMap;
     int m_EscapeKey = 0;
     unsigned m_EscapeModifiers = 0;
     std::set<int> m_Physical;
     std::set<int> m_Emitted;
-    std::map<int, Rule> m_Active;
 };
 } // namespace macinput

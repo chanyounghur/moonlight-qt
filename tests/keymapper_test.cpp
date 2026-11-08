@@ -1,30 +1,25 @@
 #include "../app/streaming/input/keymapper.h"
-
 #include <cstdlib>
 #include <iostream>
 #include <random>
-#include <string>
 
 using namespace macinput;
-enum Key { A = 4, Z = 29, Space = 44, Caps = 57, Tab = 43,
-           Ctrl = 224, ShiftKey = 225, AltKey = 226, Cmd = 227,
-           RightCtrl = 228, RightAlt = 230 };
+enum Key { A = 4, C = 6, Q = 20, Z = 29, Space = 44, Caps = 57, Tab = 43,
+           Ctrl = 224, ShiftKey = 225, AltKey = 226, Win = 227,
+           RightCtrl = 228, RightShift = 229, RightAlt = 230, RightWin = 231 };
 
 void check(bool value, const char* message)
 {
-    if (!value) {
-        std::cerr << "FAIL: " << message << '\n';
-        std::exit(1);
-    }
+    if (!value) { std::cerr << "FAIL: " << message << '\n'; std::exit(1); }
 }
 
 KeyMapper mapper()
 {
     KeyMapper result;
-    result.configure({{Ctrl, Control}, {RightCtrl, Control}, {ShiftKey, Shift},
-                      {AltKey, Alt}, {RightAlt, Alt}, {Cmd, Meta}},
-                     {{Caps, 0, {Ctrl, Space}}, {Space, Alt, {Cmd, Space}},
-                      {Tab, Alt, {Cmd, Tab}, true}}, Z, Control | Alt | Shift);
+    result.configure({{Ctrl, Control}, {RightCtrl, Control}, {ShiftKey, Shift}, {RightShift, Shift},
+                      {AltKey, Alt}, {RightAlt, Alt}, {Win, Meta}, {RightWin, Meta}},
+                     {{AltKey, Win}, {Win, AltKey}, {RightAlt, RightWin}, {RightWin, RightAlt}},
+                     Z, Control | Alt | Shift);
     return result;
 }
 
@@ -43,116 +38,91 @@ int main()
 {
     {
         auto m = mapper();
-        expect(m.process(A, true), {{A, true}});
-        expect(m.process(A, true), {});
-        expect(m.process(A, false), {{A, false}});
-        expect(m.process(A, false), {});
-    }
-    {
-        auto m = mapper();
-        auto result = m.process(Caps, true);
-        expect(result, {{Ctrl, true}, {Space, true}});
-        check(result.events.back().modifiers == Control, "Caps sends Control with Space");
+        expect(m.process(Caps, true), {{Caps, true}}); // Never synthesize Ctrl+Space.
         expect(m.process(Caps, true), {});
-        expect(m.process(Caps, false), {{Space, false}, {Ctrl, false}});
+        expect(m.process(Caps, false), {{Caps, false}});
+        expect(m.process(Caps, false), {});
+    }
+    {
+        // Every key gets Command without needing a registered shortcut recipe.
+        for (int ordinary : {A, C, Q, Space, Tab, Caps}) {
+            auto m = mapper();
+            expect(m.process(AltKey, true), {{Win, true}});
+            auto event = m.process(ordinary, true);
+            expect(event, {{ordinary, true}});
+            check(event.events[0].modifiers == Meta, "Command role on arbitrary ordinary key");
+            expect(m.process(ordinary, false), {{ordinary, false}});
+            expect(m.process(AltKey, false), {{Win, false}});
+        }
     }
     {
         auto m = mapper();
-        expect(m.process(AltKey, true), {{AltKey, true}});
-        auto result = m.process(Space, true);
-        expect(result, {{AltKey, false}, {Cmd, true}, {Space, true}});
-        check(result.events.back().modifiers == Meta, "Option must not leak into Spotlight");
-        expect(m.process(Space, false), {{Space, false}, {Cmd, false}, {AltKey, true}});
-        expect(m.process(AltKey, false), {{AltKey, false}});
+        expect(m.process(Win, true), {{AltKey, true}});
+        auto event = m.process(A, true);
+        check(event.events[0].modifiers == Alt, "Windows key becomes Option");
+        expect(m.process(Win, false), {{AltKey, false}});
+        expect(m.process(A, false), {{A, false}});
     }
     {
         auto m = mapper();
-        m.process(RightAlt, true);
-        expect(m.process(Space, true), {{RightAlt, false}, {Cmd, true}, {Space, true}});
-        expect(m.process(RightAlt, false), {});
-        expect(m.process(Space, false), {{Space, false}, {Cmd, false}});
+        expect(m.process(RightAlt, true), {{RightWin, true}});
+        expect(m.process(RightWin, true), {{RightAlt, true}});
+        auto event = m.process(C, true);
+        check(event.events[0].modifiers == (Meta | Alt), "right Command+Option roles");
+        expect(m.process(RightAlt, false), {{RightWin, false}});
+        expect(m.process(RightWin, false), {{RightAlt, false}});
+        expect(m.process(C, false), {{C, false}});
     }
     {
         auto m = mapper();
         m.process(AltKey, true);
-        m.process(Tab, true);
-        expect(m.process(Space, true), {{Space, true}});
-        expect(m.process(Tab, false), {{Tab, false}}); // Command is shared.
-        expect(m.process(AltKey, false), {});
-        expect(m.process(Space, false), {{Space, false}, {Cmd, false}});
-    }
-    {
-        auto m = mapper();
-        m.process(AltKey, true);
-        expect(m.process(Tab, true), {{AltKey, false}, {Cmd, true}, {Tab, true}});
-        expect(m.process(Tab, false), {{Tab, false}});
         expect(m.process(Tab, true), {{Tab, true}});
         expect(m.process(Tab, false), {{Tab, false}});
-        expect(m.process(AltKey, false), {{Cmd, false}});
-    }
-    {
-        auto m = mapper();
-        m.process(AltKey, true);
-        m.process(Tab, true);
-        expect(m.process(AltKey, false), {{Cmd, false}});
-        expect(m.process(Tab, false), {{Tab, false}});
-    }
-    {
-        auto m = mapper();
-        m.process(Caps, true);
-        expect(m.process(Ctrl, true), {}); // Physical and synthesized Control overlap.
-        expect(m.process(Caps, false), {{Space, false}});
-        expect(m.process(Ctrl, false), {{Ctrl, false}});
-    }
-    {
-        auto m = mapper();
         m.process(ShiftKey, true);
-        expect(m.process(Caps, true), {{Caps, true}}); // Exact modifiers, no accidental mapping.
-        m.clear();
-        expect(m.process(Caps, false), {});
-        expect(m.process(ShiftKey, false), {});
-        expect(m.process(A, true), {{A, true}});
-    }
-    {
-        auto m = mapper();
-        m.process(Caps, true);
-        m.clear(); // Adapter raises protocol keys during focus loss.
-        expect(m.process(Caps, false), {});
-        expect(m.process(Caps, true), {{Ctrl, true}, {Space, true}});
+        auto event = m.process(Tab, true);
+        check(event.events[0].modifiers == (Meta | Shift), "reverse app cycling");
+        expect(m.process(AltKey, false), {{Win, false}}); // Release even while Tab is down.
+        expect(m.process(Tab, false), {{Tab, false}});
     }
     {
         auto m = mapper();
         m.process(Ctrl, true);
         m.process(AltKey, true);
         m.process(ShiftKey, true);
-        auto result = m.process(Z, true);
-        check(result.releaseCapture, "escape releases capture");
-        expect(result, {{Ctrl, false}, {ShiftKey, false}, {AltKey, false}});
+        auto event = m.process(Z, true);
+        check(event.releaseCapture, "escape uses physical Alt, not mapped Option");
+        expect(event, {{Ctrl, false}, {ShiftKey, false}, {Win, false}});
         expect(m.process(Z, false), {});
         expect(m.process(Ctrl, false), {});
         expect(m.process(AltKey, false), {});
-        expect(m.process(ShiftKey, false), {});
     }
     {
-        // Exercise overlapping mappings and arbitrary release ordering. Replay
-        // the emitted stream as a host: no duplicate down, orphan up, or stuck key.
+        auto m = mapper();
+        m.process(AltKey, true);
+        m.process(Caps, true);
+        m.clear(); // Adapter raises actual protocol keys on focus loss.
+        expect(m.process(AltKey, false), {});
+        expect(m.process(Caps, false), {});
+        expect(m.process(Caps, true), {{Caps, true}});
+    }
+    {
         std::mt19937 random(20261108);
-        const int keys[] = {A, Caps, Space, Tab, Ctrl, RightCtrl, AltKey, RightAlt, ShiftKey, Cmd};
+        const int keys[] = {A, Caps, Space, Tab, Ctrl, RightCtrl, AltKey, RightAlt,
+                            ShiftKey, RightShift, Win, RightWin};
         for (int scenario = 0; scenario < 1000; ++scenario) {
             auto m = mapper();
             std::set<int> host;
             auto replay = [&](const Result& result) {
                 for (const auto& event : result.events) {
-                    if (event.down) check(host.insert(event.key).second, "duplicate host key down");
-                    else check(host.erase(event.key) == 1, "orphan host key up");
+                    if (event.down) check(host.insert(event.key).second, "duplicate host down");
+                    else check(host.erase(event.key) == 1, "orphan host up");
                 }
             };
-            for (int step = 0; step < 100; ++step) {
-                replay(m.process(keys[random() % 10], (random() % 2) != 0));
-            }
+            for (int step = 0; step < 100; ++step)
+                replay(m.process(keys[random() % 12], (random() % 2) != 0));
             for (int key : keys) replay(m.process(key, false));
             check(host.empty(), "all physical releases leave host empty");
         }
     }
-    std::cout << "Key mapper tests passed (including 1000 randomized sequences).\n";
+    std::cout << "Mac layout and raw Caps Lock tests passed (1000 randomized sequences).\n";
 }

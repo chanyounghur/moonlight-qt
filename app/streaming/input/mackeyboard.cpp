@@ -3,7 +3,6 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -35,16 +34,6 @@ bool parseChord(const QString& text, int& key, unsigned& modifiers)
     return key != SDL_SCANCODE_UNKNOWN;
 }
 
-std::vector<int> outputKeys(int key, unsigned modifiers)
-{
-    std::vector<int> keys;
-    if (modifiers & macinput::Control) keys.push_back(SDL_SCANCODE_LCTRL);
-    if (modifiers & macinput::Alt) keys.push_back(SDL_SCANCODE_LALT);
-    if (modifiers & macinput::Shift) keys.push_back(SDL_SCANCODE_LSHIFT);
-    if (modifiers & macinput::Meta) keys.push_back(SDL_SCANCODE_LGUI);
-    keys.push_back(key);
-    return keys;
-}
 } // namespace
 
 void SdlInputHandler::initializeMacKeyboard()
@@ -57,42 +46,33 @@ void SdlInputHandler::initializeMacKeyboard()
     const auto config = document.object();
     if (!config.value("enabled").toBool(false)) return;
 
-    int escapeKey;
-    unsigned escapeModifiers;
-    std::vector<macinput::Rule> rules;
-    std::set<std::pair<int, unsigned>> inputs;
-    bool valid = config.value("version").toInt() == 1 &&
-                 parseChord(config.value("escape").toString(), escapeKey, escapeModifiers);
-    valid = valid && escapeModifiers != 0 && config.value("mappings").isArray();
-    for (const auto& value : config.value("mappings").toArray()) {
-        const auto mapping = value.toObject();
-        int inputKey, outputKey;
-        unsigned inputMods, outputMods;
-        if (!parseChord(mapping.value("from").toString(), inputKey, inputMods) ||
-            !parseChord(mapping.value("to").toString(), outputKey, outputMods) ||
-            !inputs.emplace(inputKey, inputMods).second) {
-            valid = false;
-            break;
-        }
-        const bool holdModifiers = mapping.value("holdModifiers").toBool(false);
-        if (holdModifiers && (inputMods == 0 || outputMods == 0)) {
-            valid = false;
-            break;
-        }
-        rules.push_back({inputKey, inputMods, outputKeys(outputKey, outputMods), holdModifiers});
-    }
+    int escapeKey = 0;
+    unsigned escapeModifiers = 0;
+    const bool valid = config.value("version").toInt() == 2 &&
+        config.value("layout").toString() == "mac" &&
+        config.value("capsLock").toString() == "passthrough" &&
+        !config.contains("mappings") &&
+        parseChord(config.value("escape").toString(), escapeKey, escapeModifiers) &&
+        escapeModifiers != 0;
     if (!valid) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Invalid mac-keyboard.json; profile disabled");
         return;
     }
 
-    m_MacKeyMapper.configure(modifierKeys, std::move(rules), escapeKey, escapeModifiers);
+    // Swap roles for every combination. Ordinary keys, including Caps Lock,
+    // pass through; macOS and the focused application interpret the shortcuts.
+    m_MacKeyMapper.configure(modifierKeys, {
+        {SDL_SCANCODE_LALT, SDL_SCANCODE_LGUI}, {SDL_SCANCODE_RALT, SDL_SCANCODE_RGUI},
+        {SDL_SCANCODE_LGUI, SDL_SCANCODE_LALT}, {SDL_SCANCODE_RGUI, SDL_SCANCODE_RALT},
+    }, escapeKey, escapeModifiers);
+    m_BlockLocalCapsLock = config.value("blockLocalCapsLock").toBool(true);
+    m_TraceCapsLock = config.value("traceCapsLock").toBool(false);
     m_MacKeyboardEnabled = true;
     m_AbsoluteMouseMode = true;
     m_PointerRegionLockActive = false;
     m_PointerRegionLockToggledByUser = true;
     m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
-    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard profile enabled; free mouse; escape: %s",
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard layout v2; CapsLock passthrough; free mouse; escape: %s",
                 config.value("escape").toString().toUtf8().constData());
 #endif
 }
@@ -104,6 +84,18 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
     if (event->repeat || !isSystemKeyCaptureActive()) return;
+
+    if (event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
+        // Raw input or queued events from an earlier capture must not duplicate
+        // the Caps Lock transition injected by our current native hook.
+        if (m_CapsLockCapture.active() && !m_CapsLockCapture.owns(*event)) return;
+        if (m_TraceCapsLock) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "CapsLock RX %s; nativeCapture=%d; Windows toggle=%d",
+                        event->state == SDL_PRESSED ? "down" : "up",
+                        m_CapsLockCapture.owns(*event), m_CapsLockCapture.localToggleState());
+        }
+    }
 
     const auto result = m_MacKeyMapper.process(event->keysym.scancode, event->state == SDL_PRESSED);
     for (const auto& output : result.events) {

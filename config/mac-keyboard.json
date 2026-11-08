@@ -1,10 +1,9 @@
 {
-  "version": 1,
+  "version": 2,
   "enabled": true,
   "escape": "Ctrl+Alt+Shift+Z",
-  "mappings": [
-    { "from": "CapsLock", "to": "Ctrl+Space" },
-    { "from": "Alt+Space", "to": "Command+Space" },
-    { "from": "Alt+Tab", "to": "Command+Tab", "holdModifiers": true }
-  ]
+  "layout": "mac",
+  "capsLock": "passthrough",
+  "blockLocalCapsLock": true,
+  "traceCapsLock": true
 }

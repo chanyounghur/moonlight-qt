@@ -511,11 +511,15 @@ void SdlInputHandler::handleTranslatedKeyEvent(SDL_KeyboardEvent* event)
         m_KeysDown.remove(MAKE_KEYPRESS_STATE(keyCode, modifiers, flags));
     }
 
-    LiSendKeyboardEvent2(keyCode,
+    const int sendResult = LiSendKeyboardEvent2(keyCode,
                          event->state == SDL_PRESSED ?
                              KEY_ACTION_DOWN : KEY_ACTION_UP,
                          modifiers,
                          flags);
+    if (m_MacKeyboardEnabled && m_TraceCapsLock && event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "CapsLock TX %s; VK=0x%04X; sendResult=%d",
+                    event->state == SDL_PRESSED ? "down" : "up", static_cast<unsigned short>(keyCode), sendResult);
+    }
 }
 
 void SdlInputHandler::raiseAllKeys()
