@@ -315,7 +315,7 @@ void SdlInputHandler::updateKeyboardGrabState()
     bool shouldGrab = m_CaptureSystemKeysMode != StreamingPreferences::CSK_OFF && isCaptureActive();
     if (m_MacKeyboardEnabled) {
         shouldGrab = shouldGrab && !m_MacKeyboardReleased &&
-                     RawKeyboardScope::hasForeground(m_Window);
+                     NativeKeyboardCapture::hasForeground(m_Window);
     }
     if (shouldGrab) {
         Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
@@ -332,14 +332,19 @@ void SdlInputHandler::updateKeyboardGrabState()
 #if SDL_VERSION_ATLEAST(2, 0, 15)
     // On SDL 2.0.15+, we can get keyboard-only grab on Win32, X11, and Wayland.
     // SDL 2.0.18 adds keyboard grab on macOS (if built with non-AppStore APIs).
-    SDL_SetWindowKeyboardGrab(m_Window, shouldGrab ? SDL_TRUE : SDL_FALSE);
+    SDL_SetWindowKeyboardGrab(m_Window, shouldGrab && !m_MacKeyboardEnabled ? SDL_TRUE : SDL_FALSE);
 #endif
 
     m_KeyboardCaptureActive = shouldGrab;
     if (m_MacKeyboardEnabled) {
-        m_RawKeyboardScope.setActive(m_Window, shouldGrab && m_RawKeyboard);
+        if (!m_NativeKeyboardCapture.setActive(m_Window, shouldGrab, m_BlockLocalCapsLock)) {
+            m_KeyboardCaptureActive = false;
+            m_MacKeyboardReleased = true;
+            raiseAllKeys();
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Mac native keyboard unavailable; capture released");
+        }
         const bool wasActive = m_CapsLockCapture.active();
-        m_CapsLockCapture.setActive(m_Window, shouldGrab && m_BlockLocalCapsLock);
+        m_CapsLockCapture.setActive(m_Window, false);
         if (m_TraceCapsLock && wasActive != m_CapsLockCapture.active()) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "CapsLock capture %s; Windows toggle=%d",
                         m_CapsLockCapture.active() ? "on" : "off", m_CapsLockCapture.localToggleState());
@@ -356,7 +361,7 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
     if (m_Window == nullptr) {
         return false;
     }
-    if (m_MacKeyboardEnabled && !RawKeyboardScope::hasForeground(m_Window)) return false;
+    if (m_MacKeyboardEnabled && !NativeKeyboardCapture::hasForeground(m_Window)) return false;
 
     // NB: We used to check SDL_WINDOW_KEYBOARD_GRABBED here, but this isn't
     // always set when capture "fails" on SDL3, even though the user may have

@@ -1,5 +1,5 @@
 #define SDL_MAIN_HANDLED
-#include "streaming/input/rawkeyboardscope.h"
+#include "streaming/input/nativekeyboardcapture.h"
 #include <SDL_syswm.h>
 #include <iostream>
 #include <string>
@@ -17,8 +17,15 @@ struct ProbeState {
     volatile LONG altDown, altUp, ctrlDown, ctrlUp, cDown, cUp;
 };
 
-void record(const SDL_Event& event, ProbeState& state)
+NativeKeyboardCapture* recordingScope = nullptr;
+void record(const SDL_Event& source, ProbeState& state)
 {
+    SDL_Event event = source;
+    if (recordingScope) {
+        SDL_KeyboardEvent key{};
+        if (event.type != SDL_USEREVENT || !recordingScope->translate(event.user, key)) return;
+        event.key = key;
+    }
     if (event.type != SDL_KEYDOWN && event.type != SDL_KEYUP) return;
     const bool down = event.type == SDL_KEYDOWN;
     switch (event.key.keysym.scancode) {
@@ -103,7 +110,9 @@ int runKeyboardPeer(const char* mode, const char* name)
     // Test fixture only; production must never load or activate an OS layout.
     auto korean = LoadKeyboardLayoutW(L"00000412", KLF_ACTIVATE);
     if (!korean || !ActivateKeyboardLayout(korean, 0)) return 6;
-    RawKeyboardScope scope;
+    NativeKeyboardCapture scope;
+    recordingScope = raw ? &scope : nullptr;
+    SDL_StopTextInput();
     state->window = nativeWindow(window);
     state->layout = GetKeyboardLayout(0);
     InterlockedExchange(&state->ready, 1);
@@ -113,9 +122,7 @@ int runKeyboardPeer(const char* mode, const char* name)
             if (raw && event.type == SDL_WINDOWEVENT) {
                 if (event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
                     scope.setActive(window, true);
-                    SDL_SetWindowKeyboardGrab(window, SDL_TRUE);
                 } else if (event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                    SDL_SetWindowKeyboardGrab(window, SDL_FALSE);
                     scope.setActive(nullptr, false);
                 }
             }
@@ -124,7 +131,6 @@ int runKeyboardPeer(const char* mode, const char* name)
         state->layout = GetKeyboardLayout(0);
         SDL_Delay(5);
     }
-    SDL_SetWindowKeyboardGrab(window, SDL_FALSE);
     scope.setActive(nullptr, false);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -133,7 +139,7 @@ int runKeyboardPeer(const char* mode, const char* name)
     return 0;
 }
 
-void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other)
+void testNativeKeyboardCapture(SDL_Window* stream, SDL_Window* other)
 {
     (void)other;
     const auto original = GetKeyboardLayout(0);
@@ -141,7 +147,8 @@ void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other)
     const auto korean = LoadKeyboardLayoutW(L"00000412", KLF_ACTIVATE);
     check(korean && ActivateKeyboardLayout(korean, 0), "Korean test fixture unavailable");
     pump();
-    RawKeyboardScope scope;
+    NativeKeyboardCapture scope;
+    recordingScope = &scope;
     try {
         Peer second("--raw-peer", 1);
         Peer local("--local-peer", 2);
@@ -150,7 +157,6 @@ void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other)
         pump();
         const auto layoutCount = GetKeyboardLayoutList(0, nullptr);
         check(scope.setActive(stream, true), "raw capture activation failed");
-        SDL_SetWindowKeyboardGrab(stream, SDL_TRUE);
         pump();
         check(GetKeyboardLayout(0) == korean, "raw capture changed Korean keyboard layout");
         ProbeState received{};
@@ -161,7 +167,6 @@ void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other)
         check(received.altDown == 1 && received.altUp == 1, "raw right Alt needs one down AND up under Korean layout");
 
         // Leave capture before transferring focus, as an explicit escape would.
-        SDL_SetWindowKeyboardGrab(stream, SDL_FALSE);
         scope.setActive(nullptr, false);
         foreground(second.state->window);
         check(second.state->layout == korean, "second stream lost Korean layout");
@@ -193,7 +198,6 @@ void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other)
         check(GetKeyboardLayout(0) == korean, "recapture/escape changed layout");
         std::cout << "Raw keyboard test passed: Korean right Alt down/up, two stream processes, independent Windows app, foreground isolation, no OS layout changes.\n";
     } catch (...) {
-        SDL_SetWindowKeyboardGrab(stream, SDL_FALSE);
         scope.setActive(nullptr, false);
         ActivateKeyboardLayout(original, 0);
         throw;

@@ -1,12 +1,11 @@
 #define SDL_MAIN_HANDLED
-#include "streaming/input/capslockcapture.h"
-#include "streaming/input/rawkeyboardscope.h"
+#include "streaming/input/nativekeyboardcapture.h"
 #include <SDL_syswm.h>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 
-void testRawKeyboardScope(SDL_Window* stream, SDL_Window* other);
+void testNativeKeyboardScope(SDL_Window* stream, SDL_Window* other);
 int runKeyboardPeer(const char* mode, const char* name);
 
 struct CapsDiagnostic { WPARAM message; DWORD scan, flags; };
@@ -35,7 +34,7 @@ HWND nativeWindow(SDL_Window* window)
     return info.info.win.window;
 }
 
-void pump(CapsLockCapture& capture, int& downs, int& ups)
+void pump(NativeKeyboardCapture& capture, int& downs, int& ups)
 {
     const auto start = SDL_GetTicks();
     do {
@@ -52,7 +51,7 @@ void pump(CapsLockCapture& capture, int& downs, int& ups)
     } while (SDL_GetTicks() - start < 150);
 }
 
-void focus(SDL_Window* window, CapsLockCapture& capture, int& downs, int& ups)
+void focus(SDL_Window* window, NativeKeyboardCapture& capture, int& downs, int& ups)
 {
     SDL_RaiseWindow(window);
     SetForegroundWindow(nativeWindow(window));
@@ -72,14 +71,17 @@ void sendCaps(SDL_Window* window, bool down)
 
 int main(int argc, char** argv)
 {
+    const auto helper = NativeKeyboardCapture::runHelper(argc, argv);
+    if (helper >= 0) return helper;
+    if (!GetEnvironmentVariableA("GITHUB_ACTIONS", nullptr, 0)) return 99;
     if (argc == 3 && (std::string(argv[1]) == "--raw-peer" || std::string(argv[1]) == "--local-peer"))
         return runKeyboardPeer(argv[1], argv[2]);
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) return 1;
+    SDL_StopTextInput();
     auto* stream = SDL_CreateWindow("Caps Lock capture integration test", 80, 80, 360, 160, SDL_WINDOW_SHOWN);
     auto* other = SDL_CreateWindow("Local window", 480, 80, 360, 160, SDL_WINDOW_SHOWN);
-    CapsLockCapture capture;
-    RawKeyboardScope raw;
+    NativeKeyboardCapture capture;
     HHOOK diagnosticHook = nullptr;
     int downs = 0, ups = 0;
     int status = 0;
@@ -87,8 +89,6 @@ int main(int argc, char** argv)
     try {
         check(stream && other, "SDL test windows unavailable");
         focus(stream, capture, downs, ups);
-        check(raw.setActive(stream, true), "raw input unavailable for Caps Lock test");
-        SDL_SetWindowKeyboardGrab(stream, SDL_TRUE);
         check(capture.setActive(stream, true), "hook installation failed");
         diagnosticHook = SetWindowsHookExW(WH_KEYBOARD_LL, observeCaps, GetModuleHandleW(nullptr), 0);
         sendCaps(stream, true);
@@ -98,32 +98,30 @@ int main(int argc, char** argv)
         pump(capture, downs, ups);
         if (downs != 1 || ups != 1) {
             std::cerr << "Caps diagnostic: downs=" << downs << " ups=" << ups
-                      << " toggle=" << capture.localToggleState() << " active=" << capture.active() << '\n';
+                      << " toggle=" << (GetKeyState(VK_CAPITAL) & 1) << " active=" << capture.active() << '\n';
             for (unsigned i = 0; i < capsDiagnosticCount; ++i)
                 std::cerr << "Caps native message=" << capsDiagnostics[i].message << " scan=" << capsDiagnostics[i].scan
                           << " flags=" << capsDiagnostics[i].flags << '\n';
         }
         check(downs == 1 && ups == 1, "expected one raw Caps Lock down/up pair");
-        check(capture.localToggleState() == originalToggle, "Windows Caps Lock changed while captured");
+        check((GetKeyState(VK_CAPITAL) & 1) == originalToggle, "Windows Caps Lock changed while captured");
 
         // The hook must pass Caps Lock through when another window is foreground,
         // even before Moonlight's focus-lost event removes the hook.
-        SDL_SetWindowKeyboardGrab(stream, SDL_FALSE);
-        raw.setActive(nullptr, false);
         focus(other, capture, downs, ups);
         sendCaps(other, true);
         sendCaps(other, false);
         pump(capture, downs, ups);
-        check(capture.localToggleState() != originalToggle, "local Caps Lock did not work outside stream");
+        check((GetKeyState(VK_CAPITAL) & 1) != originalToggle, "local Caps Lock did not work outside stream");
         check(downs == 1 && ups == 1, "captured input from another foreground window");
 
         capture.setActive(nullptr, false);
         sendCaps(other, true);
         sendCaps(other, false);
         pump(capture, downs, ups);
-        check(capture.localToggleState() == originalToggle, "failed to restore original toggle");
+        check((GetKeyState(VK_CAPITAL) & 1) == originalToggle, "failed to restore original toggle");
         std::cout << "Native Caps Lock capture test passed: raw down/up, repeat suppression, local toggle isolation.\n";
-        testRawKeyboardScope(stream, other);
+        testNativeKeyboardScope(stream, other);
     }
     catch (const std::exception& e) {
         std::cerr << "FAIL: " << e.what() << '\n';
@@ -131,7 +129,6 @@ int main(int argc, char** argv)
     }
     capture.setActive(nullptr, false);
     if (diagnosticHook) UnhookWindowsHookEx(diagnosticHook);
-    raw.setActive(nullptr, false);
     SDL_DestroyWindow(other);
     SDL_DestroyWindow(stream);
     SDL_Quit();

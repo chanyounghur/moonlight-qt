@@ -16,7 +16,7 @@ function Invoke-Package([string]$path, [string]$verb, [string]$stage) {
 
 function Verify-Installed([string]$stage) {
     $profile = Get-Content (Join-Path $installDir 'mac-keyboard.json') -Raw | ConvertFrom-Json
-    if (!$profile.enabled -or !$profile.rawKeyboard -or $profile.capsLock -ne 'ctrl-space' -or $profile.PSObject.Properties.Name -contains 'normalizeKoreanModifiers') {
+    if (!$profile.enabled -or $profile.PSObject.Properties.Name -contains 'rawKeyboard' -or $profile.capsLock -ne 'ctrl-space' -or $profile.PSObject.Properties.Name -contains 'normalizeKoreanModifiers') {
         throw "${stage}: wrong installed keyboard profile"
     }
     if (Test-Path (Join-Path $installDir 'portable.dat')) { throw "${stage}: portable settings unexpectedly enabled" }

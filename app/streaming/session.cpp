@@ -2003,7 +2003,7 @@ void Session::exec()
 
         case SDL_USEREVENT:
             switch (event.user.code) {
-            case CapsLockCapture::EventCode:
+            case NativeKeyboardCapture::EventCode:
                 m_InputHandler->handleMacKeyboardEvent(&event.user);
                 break;
             case SDL_CODE_FRAME_READY:

@@ -24,6 +24,7 @@
 // that might include SDL.h themselves.
 #define SDL_MAIN_HANDLED
 #include "SDL_compat.h"
+#include "streaming/input/nativekeyboardcapture.h"
 
 #ifdef HAVE_FFMPEG
 #include "streaming/video/ffmpeg.h"
@@ -420,6 +421,8 @@ void configureSignalHandlers()
 
 int main(int argc, char *argv[])
 {
+    const int keyboardHelper = NativeKeyboardCapture::runHelper(argc, argv);
+    if (keyboardHelper >= 0) return keyboardHelper;
     SDL_SetMainReady();
 
     // Set the app version for the QCommandLineParser's showVersion() command

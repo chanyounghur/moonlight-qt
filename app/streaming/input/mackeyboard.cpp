@@ -74,7 +74,6 @@ void SdlInputHandler::initializeMacKeyboard()
     }, escapeKey, escapeModifiers, inputSource);
     m_BlockLocalCapsLock = config.value("blockLocalCapsLock").toBool(true);
     m_TraceCapsLock = config.value("traceCapsLock").toBool(false);
-    m_RawKeyboard = config.value("rawKeyboard").toBool(true);
     m_TraceModifierKeys = config.value("traceModifierKeys").toBool(false);
     m_MacKeyboardEnabled = true;
     m_AbsoluteMouseMode = true;
@@ -90,7 +89,14 @@ void SdlInputHandler::initializeMacKeyboard()
 void SdlInputHandler::handleMacKeyboardEvent(SDL_UserEvent* event)
 {
     SDL_KeyboardEvent key{};
-    if (m_CapsLockCapture.translate(*event, key)) handleKeyEvent(&key);
+    if (m_NativeKeyboardCapture.failed(*event)) {
+        raiseAllKeys();
+        m_MacKeyboardReleased = true;
+        setCaptureActive(false);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Mac keyboard helper failed; capture released");
+        return;
+    }
+    if (m_NativeKeyboardCapture.translate(*event, key)) handleKeyEvent(&key);
 }
 
 void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
@@ -100,6 +106,8 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
         return;
     }
     if (event->repeat || !isSystemKeyCaptureActive()) return;
+    // All profile keyboard events come from one ordered native stream.
+    if (!m_NativeKeyboardCapture.owns(*event)) return;
 
     if (m_TraceModifierKeys && (event->keysym.scancode == SDL_SCANCODE_RALT ||
                                event->keysym.scancode == SDL_SCANCODE_APPLICATION ||
@@ -116,12 +124,12 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     if (event->keysym.scancode == SDL_SCANCODE_CAPSLOCK) {
         // Raw input or queued events from an earlier capture must not duplicate
         // the Caps Lock transition injected by our current native hook.
-        if (m_CapsLockCapture.active() && !m_CapsLockCapture.owns(*event)) return;
+        if (m_CapsLockCapture.active() && !m_NativeKeyboardCapture.owns(*event)) return;
         if (m_TraceCapsLock) {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
                         "CapsLock RX %s; nativeCapture=%d; Windows toggle=%d",
                         event->state == SDL_PRESSED ? "down" : "up",
-                        m_CapsLockCapture.owns(*event), m_CapsLockCapture.localToggleState());
+                        m_NativeKeyboardCapture.owns(*event), m_CapsLockCapture.localToggleState());
         }
     }
 
