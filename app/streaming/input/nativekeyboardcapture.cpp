@@ -148,7 +148,7 @@ struct NativeKeyboardCapture::Impl {
         if (shared) UnmapViewOfFile(shared);
         close(process); close(parent); close(stop); close(notification); close(mapping);
     }
-    void event(const Packet& packet) {
+    bool event(const Packet& packet) {
         SDL_Event event{};
         event.type = SDL_USEREVENT;
         event.user.code = EventCode;
@@ -159,7 +159,9 @@ struct NativeKeyboardCapture::Impl {
             broken = true;
             InterlockedExchange(&shared->fault, 1);
             InterlockedExchange(&shared->enabled, 0);
+            return false;
         }
+        return true;
     }
     bool start() {
         SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
@@ -196,7 +198,6 @@ struct NativeKeyboardCapture::Impl {
         if (WaitForMultipleObjects(2, initial, FALSE, 3000) != WAIT_OBJECT_0 + 1 || read(shared->ready) != 1) return false;
         receiver = std::thread([this] {
             HANDLE wait[]{stop, process, notification};
-            bool reported = false;
             while (true) {
                 const auto result = WaitForMultipleObjects(3, wait, FALSE, 100);
                 if (result == WAIT_OBJECT_0) break;
@@ -204,10 +205,11 @@ struct NativeKeyboardCapture::Impl {
                     static_cast<DWORD>(GetTickCount() - static_cast<DWORD>(read(shared->heartbeat))) > 1500) {
                     broken = true;
                     InterlockedExchange(&shared->enabled, 0);
-                    if (!reported) {
-                        event({static_cast<Uint32>(read(shared->generation)), shared->windowId, Fault});
-                        reported = true;
-                    }
+                    // If SDL's queue filled, retry the release notification
+                    // after it drains. Never leave remote modifiers held merely
+                    // because the first failure notification could not fit.
+                    const Packet failure{static_cast<Uint32>(read(shared->generation)), shared->windowId, Fault};
+                    while (!event(failure) && WaitForSingleObject(stop, 50) == WAIT_TIMEOUT) {}
                     break;
                 }
                 auto tail = read(shared->tail);
@@ -215,7 +217,7 @@ struct NativeKeyboardCapture::Impl {
                     const auto packet = shared->packets[tail];
                     tail = (tail + 1) % Capacity;
                     InterlockedExchange(&shared->tail, tail);
-                    event(packet);
+                    if (!event(packet)) break;
                 }
             }
         });
@@ -246,10 +248,11 @@ bool NativeKeyboardCapture::setActive(SDL_Window* window, bool enabled, bool blo
         return true;
     }
     if (!hasForeground(window) || self.broken) return false;
-    if (active()) return true;
-    if (!self.process && !self.start()) { self.broken = true; return false; }
     SDL_SysWMinfo info{}; SDL_VERSION(&info.version);
     if (!SDL_GetWindowWMInfo(window, &info)) return false;
+    if (active() && self.shared->target == info.info.win.window) return true;
+    if (!self.process && !self.start()) { self.broken = true; return false; }
+    InterlockedExchange(&self.shared->enabled, 0);
     self.shared->target = info.info.win.window;
     self.shared->windowId = SDL_GetWindowID(window);
     self.shared->blockCaps = blockCaps;

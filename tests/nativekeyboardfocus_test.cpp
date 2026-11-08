@@ -142,7 +142,7 @@ int runKeyboardPeer(const char* mode, const char* name)
     return 0;
 }
 
-void testNativeKeyboardCapture(SDL_Window* stream, SDL_Window* other)
+void testNativeKeyboardScope(SDL_Window* stream, SDL_Window* other)
 {
     (void)other;
     const auto original = GetKeyboardLayout(0);

@@ -37,7 +37,7 @@ jobs:
           submodules: recursive
       - name: Download upstream dependencies
         run: ./setup-deps.ps1
-      - name: Test native Caps Lock and cross-process raw keyboard isolation
+      - name: Test keyboard helper, ordered input, and foreground isolation
         shell: cmd
         run: scripts\test-windows-input.bat
       - name: Install Qt

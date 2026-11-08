@@ -1,7 +1,7 @@
 # Windows → Mac 키보드 v5 / Windows 입력기 상태 유지
 
 Moonlight Qt v6.2.0 기반 Windows x64 개인용 포크입니다.
-v5는 US 키보드 배열을 임시로 활성화하던 코드를 제거하고 SDL Raw Input을 사용합니다.
+v5는 US 키보드 배열을 임시로 활성화하던 코드를 제거하고 전용 입력 보조 프로세스를 사용합니다.
 Windows 키보드 배열·입력 언어·IME 설정을 변경하는 API를 호출하지 않습니다.
 
 ## 설치 및 업데이트
@@ -44,10 +44,19 @@ Super와 오른쪽 Alt를 같이 누르면 둘 다 뗄 때까지 오른쪽 Comma
 재클릭 또는 포커스 복귀 시 재개합니다. 탈출 후 단순 창 크기 변경은 재캡처하지 않습니다.
 Ctrl+Alt+Del과 보안 데스크톱은 차단하지 않습니다.
 
-v3/v4의 한국어 → US 배열 전환·복원 방식은 폐기했습니다. 현재 포함된 SDL3 기반
-Raw Input을 스트림 캡처 중에만 활성화하고, 백그라운드 키 입력 수신은 끕니다.
-캡처 해제 시 SDL 설정을 이전 값으로 복원합니다. `normalizeKoreanModifiers`는
-이제 사용하지 않으며, 이전 설정 파일에 남아 있어도 Windows 배열을 바꾸지 않습니다.
+v3/v4의 한국어 → US 배열 전환·복원 방식은 폐기했습니다. Moonlight는 스트림에서
+처음 키를 캡처할 때 같은 실행 파일을 숨겨진 입력 보조 프로세스로 실행합니다.
+별도 프로그램 실행이나 추가 포크는 필요 없습니다. 연결 종료 시 자동 종료합니다.
+
+보조 프로세스는 Windows 전경 창이 해당 스트림과 정확히 일치할 때만 키를 가로챕니다.
+일반 키와 시스템 단축키는 네이티브 훅으로, 한국어 배열에서 뗌 정보가 사라지는
+오른쪽 Alt는 Raw Input으로 읽고, 하나의 순서가 있는 이벤트 큐로 전달합니다.
+스트림을 표시하는 프로세스에는 SDL Raw Input을 켜지 않습니다. 직접 켜는 방식은
+Caps Lock 및 시스템 단축키 차단과 충돌하는 것을 Windows CI에서 확인했습니다.
+
+`normalizeKoreanModifiers`와 실험용 `rawKeyboard` 설정은 더 이상 사용하지 않습니다.
+보조 프로세스 시작 실패·종료·응답 정지·입력 큐 초과 시 캡처를 해제합니다.
+창 밖에서 누른 키는 원격으로 보내거나 로그에 기록하지 않습니다.
 물리 키보드가 실제 한영 전용 신호만 보내는 경우에는 오른쪽 Alt로 읽을 수 없을 수 있습니다.
 
 ## Caps Lock 입력 소스 전환
@@ -74,7 +83,6 @@ Program Files 안의 파일 변경에는 관리자 권한이 필요합니다.
   "layout": "mac",
   "capsLock": "ctrl-space",
   "blockLocalCapsLock": true,
-  "rawKeyboard": true,
   "traceModifierKeys": true,
   "traceCapsLock": true
 }
@@ -82,7 +90,6 @@ Program Files 안의 파일 변경에는 관리자 권한이 필요합니다.
 
 - `enabled: false`: 프로필을 끄고 기존 Moonlight 입력 방식 사용
 - `capsLock: "passthrough"`: Caps Lock 원형 전달
-- `rawKeyboard: false`: 비교 진단용 일반 SDL 키 입력 사용; OS 배열은 어느 모드에서도 변경하지 않음
 - `blockLocalCapsLock: false`: 비교 진단용 로컬 Caps Lock 차단 해제
 - `traceModifierKeys`, `traceCapsLock`: 해당 키 진단 로그 사용 여부
 
@@ -93,21 +100,21 @@ Program Files 안의 파일 변경에는 관리자 권한이 필요합니다.
 
 `%TEMP%`의 최신 `Moonlight-*.log`에서 다음 항목을 확인합니다.
 
-- `Mac raw keyboard on/off; ... Windows layout unchanged`: 프로세스 내 raw 입력 설정
+- `Mac native keyboard on/off`: 보조 프로세스의 키 캡처 상태
 - `Mac modifier RX down/up; scancode=230`: 오른쪽 Alt 입력
-- `CapsLock capture on/off`: Caps Lock 전용 훅 상태
 - `CapsLock input-source shortcut: Ctrl+Space; taps=1`: 전환용 이벤트 생성
 
 로그는 Mac의 실제 한영 전환 성공 응답이 아닙니다. 일반 글자나 입력 문장은 기록하지 않습니다.
 
 자동 검증 범위는 2,000개 키 상태 시퀀스, Caps Lock 로컬 차단, 한국어 배열에서의
-Raw Input 오른쪽 Alt down/up, 두 스트림 프로세스와 별도 Windows 창 사이의 전환,
+오른쪽 Alt down/up와 빠른 연속 조합의 순서, Alt+Tab/Windows 키 차단,
+두 스트림 프로세스와 별도 Windows 창 사이의 전환,
 외부 창의 Control+C 수신, 배열 유지, 재캡처, 공식 설치판 업그레이드 및 신규 설치입니다.
 물리 독거미 키보드와 원격 Mac에서의 한영 전환은 실기기 검증이 별도로 필요합니다.
 
 ## 유지보수
 
 `keymapper.h`: 키 역할과 Caps Lock 예외, `mackeyboard.cpp`: 설정/SDL 어댑터,
-`rawkeyboardscope.*`: 포커스 확인과 프로세스 내부 Raw Input 설정,
-`capslockcapture.*`: Caps Lock 전용 네이티브 훅입니다.
+`nativekeyboardcapture.*`: 입력 보조 프로세스, 포커스 확인, 네이티브 훅과 Raw Input,
+`windows_scancodes.h`: SDL에서 가져온 물리 스캔 코드 표입니다.
 공식 릴리스 병합 후 Actions와 실기기 입력을 검사합니다. 향후 배포는 설치 패키지를 기본으로 합니다.
