@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "enabled": true,
+  "escape": "Ctrl+Alt+Shift+Z",
+  "mappings": [
+    { "from": "CapsLock", "to": "Ctrl+Space" },
+    { "from": "Alt+Space", "to": "Command+Space" },
+    { "from": "Alt+Tab", "to": "Command+Tab" }
+  ]
+}
