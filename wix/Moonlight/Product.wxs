@@ -2,9 +2,11 @@
 <?ifdef var.MacKeyboardBuild ?>
 <?define FullName = "Moonlight Game Streaming Client (Mac Keyboard)" ?>
 <?define PackageVersion = "6.2.0.$(var.MacKeyboardBuild)" ?>
+<?define MoonlightComponentGuid = "f32bc1b2-3905-4d6d-a390-3a082d43527d" ?>
 <?else?>
 <?define FullName = "Moonlight Game Streaming Client" ?>
 <?define PackageVersion = "!(bind.fileVersion.MoonlightExe)" ?>
+<?define MoonlightComponentGuid = "*" ?>
 <?endif?>
 
 <?define ShortcutName = "$(var.ShortName)" ?>
@@ -95,13 +97,9 @@
     </Component>
 
     <DirectoryRef Id="INSTALLFOLDER">
-      <?ifdef var.MacKeyboardBuild ?>
       <!-- Companion files inherit the executable's version, so WiX requires
            an explicit, stable component identity for this file group. -->
-      <Component Id="Moonlight" Guid="f32bc1b2-3905-4d6d-a390-3a082d43527d">
-      <?else?>
-      <Component Id="Moonlight">
-      <?endif?>
+      <Component Id="Moonlight" Guid="$(var.MoonlightComponentGuid)">
         <File Id="MoonlightExe"
               KeyPath="yes"
               Checksum="yes"

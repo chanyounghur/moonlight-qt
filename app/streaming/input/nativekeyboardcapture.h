@@ -2,7 +2,7 @@
 #include "SDL_compat.h"
 #include <memory>
 
-// A background child owns both the keyboard hook and right-Alt raw input.
+// A background child owns both the keyboard hook and right-modifier raw input.
 // The foreground process never registers raw keyboards or changes OS layouts.
 class NativeKeyboardCapture {
 public:

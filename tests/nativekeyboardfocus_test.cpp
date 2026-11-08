@@ -175,13 +175,14 @@ void testNativeKeyboardScope(SDL_Window* stream, SDL_Window* other)
         std::vector<INPUT> burst;
         std::vector<unsigned> expected;
         for (int repeat = 0; repeat < 100; ++repeat) {
-            for (const auto code : {unsigned(SDL_SCANCODE_RALT)|1024, unsigned(SDL_SCANCODE_C)|1024,
-                                   unsigned(SDL_SCANCODE_C), unsigned(SDL_SCANCODE_RALT),
+            const auto modifier = repeat & 1 ? SDL_SCANCODE_RCTRL : SDL_SCANCODE_RALT;
+            for (const auto code : {unsigned(modifier)|1024, unsigned(SDL_SCANCODE_C)|1024,
+                                   unsigned(SDL_SCANCODE_C), unsigned(modifier),
                                    unsigned(SDL_SCANCODE_C)|1024, unsigned(SDL_SCANCODE_C)}) {
-                const bool alt = (code & 1023) == SDL_SCANCODE_RALT;
+                const bool modifierKey = (code & 1023) == unsigned(modifier);
                 INPUT input{}; input.type = INPUT_KEYBOARD;
-                input.ki.wScan = alt ? 0x38 : 0x2e;
-                input.ki.dwFlags = KEYEVENTF_SCANCODE | (alt ? KEYEVENTF_EXTENDEDKEY : 0) | (code & 1024 ? 0 : KEYEVENTF_KEYUP);
+                input.ki.wScan = modifierKey ? (modifier == SDL_SCANCODE_RALT ? 0x38 : 0x1d) : 0x2e;
+                input.ki.dwFlags = KEYEVENTF_SCANCODE | (modifierKey ? KEYEVENTF_EXTENDEDKEY : 0) | (code & 1024 ? 0 : KEYEVENTF_KEYUP);
                 burst.push_back(input); expected.push_back(code);
             }
         }
@@ -193,7 +194,17 @@ void testNativeKeyboardScope(SDL_Window* stream, SDL_Window* other)
                 if (sequence[i] != expected[i]) { std::cerr << "First mismatch " << i << ": " << sequence[i] << " != " << expected[i] << '\n'; break; }
             }
         }
-        check(sequence == expected, "right Alt and ordinary keys were lost, duplicated, or reordered");
+        check(sequence == expected, "right Alt/Ctrl and ordinary keys were lost, duplicated, or reordered");
+
+        sequence.clear();
+        INPUT pause{}; pause.type = INPUT_KEYBOARD; pause.ki.wVk = VK_PAUSE;
+        check(SendInput(1, &pause, sizeof(pause)) == 1, "Pause injection failed");
+        sendScan(nativeWindow(stream), 0x2e, false, true);
+        sendScan(nativeWindow(stream), 0x2e, false, false);
+        pump(&received);
+        check(sequence == std::vector<unsigned>{unsigned(SDL_SCANCODE_PAUSE)|1024, unsigned(SDL_SCANCODE_PAUSE),
+                                                unsigned(SDL_SCANCODE_C)|1024, unsigned(SDL_SCANCODE_C)},
+              "make-only Pause remained held or reordered the following key");
 
         // Windows shortcuts must remain in the stream, including Alt+Tab.
         sendScan(nativeWindow(stream), 0x38, false, true);

@@ -80,7 +80,7 @@ struct Helper {
     }
     void drainRaw() {
         // Sent hook callbacks can precede queued WM_INPUT. Drain earlier raw
-        // right-Alt transitions before appending the next intercepted key.
+        // right-modifier transitions before appending the next intercepted key.
         MSG msg;
         while (PeekMessageW(&msg, rawWindow, WM_INPUT, WM_INPUT, PM_REMOVE | PM_QS_INPUT))
             DispatchMessageW(&msg);
@@ -98,14 +98,17 @@ struct Helper {
             if (!down) self.inherited[key.vkCode] = false;
             return CallNextHookEx(nullptr, code, message, data);
         }
-        // Korean keyboard translation can collapse physical right Alt into a
-        // one-shot VK_HANGUL. Do not consume it: raw input needs the real break.
+        // Korean keyboard translation can collapse right Alt/Ctrl into one-shot
+        // VK_HANGUL/VK_HANJA. Raw input supplies their actual physical breaks.
         // The foreground stream has text input disabled; ordinary SDL duplicates
         // are ignored by the adapter. All shortcut partner keys are intercepted.
-        if (key.vkCode == VK_HANGUL || key.vkCode == VK_RMENU)
+        if (key.vkCode == VK_HANGUL || key.vkCode == VK_RMENU ||
+            key.vkCode == VK_HANJA || key.vkCode == VK_RCONTROL)
             return CallNextHookEx(nullptr, code, message, data);
         const auto mapped = scan(key.scanCode, key.vkCode, (key.flags & LLKHF_EXTENDED) != 0);
         if (!self.publish(mapped, down)) return CallNextHookEx(nullptr, code, message, data);
+        // Pause is a make-only key on physical keyboards.
+        if (key.vkCode == VK_PAUSE && down) self.publish(mapped, false);
         if (key.vkCode == VK_CAPITAL && !self.shared->blockCaps)
             return CallNextHookEx(nullptr, code, message, data);
         return 1;
@@ -118,10 +121,12 @@ struct Helper {
             if (GetRawInputData(reinterpret_cast<HRAWINPUT>(l), RID_INPUT, &input, &size,
                                 sizeof(RAWINPUTHEADER)) != UINT(-1) && input.header.dwType == RIM_TYPEKEYBOARD) {
                 const auto& key = input.data.keyboard;
-                if (key.MakeCode == 0x38 && (key.Flags & RI_KEY_E0)) {
+                if ((key.MakeCode == 0x38 || key.MakeCode == 0x1d) && (key.Flags & RI_KEY_E0)) {
                     const bool down = !(key.Flags & RI_KEY_BREAK);
-                    if (!self.inherited[VK_RMENU]) self.publish(SDL_SCANCODE_RALT, down);
-                    else if (!down) self.inherited[VK_RMENU] = false;
+                    const auto vk = key.MakeCode == 0x38 ? VK_RMENU : VK_RCONTROL;
+                    const auto mapped = key.MakeCode == 0x38 ? SDL_SCANCODE_RALT : SDL_SCANCODE_RCTRL;
+                    if (!self.inherited[vk]) self.publish(mapped, down);
+                    else if (!down) self.inherited[vk] = false;
                 }
             }
         }
