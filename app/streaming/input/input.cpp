@@ -35,6 +35,8 @@ SdlInputHandler::SdlInputHandler(StreamingPreferences& prefs, int streamWidth, i
       m_DragButton(0),
       m_NumFingersDown(0)
 {
+    initializeMacKeyboard();
+
     // System keys are always captured when running without a DE
     if (!WMUtils::isRunningDesktopEnvironment()) {
         m_CaptureSystemKeysMode = StreamingPreferences::CSK_ALWAYS;
@@ -272,6 +274,11 @@ void SdlInputHandler::setWindow(SDL_Window *window)
 
 void SdlInputHandler::notifyFocusLost()
 {
+    if (m_MacKeyboardEnabled) {
+        raiseAllKeys();
+        setCaptureActive(false);
+        return;
+    }
     // Release mouse cursor when another window is activated (e.g. by using ALT+TAB).
     // This lets user to interact with our window's title bar and with the buttons in it.
     // Doing this while the window is full-screen breaks the transition out of FS
@@ -287,6 +294,10 @@ void SdlInputHandler::notifyFocusLost()
 
 void SdlInputHandler::notifyFocusGained()
 {
+    if (m_MacKeyboardEnabled) {
+        m_MacKeyboardReleased = false;
+        setCaptureActive(true);
+    }
 }
 
 bool SdlInputHandler::isCaptureActive()
@@ -302,6 +313,10 @@ bool SdlInputHandler::isCaptureActive()
 void SdlInputHandler::updateKeyboardGrabState()
 {
     bool shouldGrab = m_CaptureSystemKeysMode != StreamingPreferences::CSK_OFF && isCaptureActive();
+    if (m_MacKeyboardEnabled) {
+        shouldGrab = shouldGrab && !m_MacKeyboardReleased &&
+                     (SDL_GetWindowFlags(m_Window) & SDL_WINDOW_INPUT_FOCUS);
+    }
     if (shouldGrab) {
         Uint32 windowFlags = SDL_GetWindowFlags(m_Window);
         if (m_CaptureSystemKeysMode == StreamingPreferences::CSK_FULLSCREEN &&
@@ -352,6 +367,8 @@ bool SdlInputHandler::isSystemKeyCaptureActive()
 
 void SdlInputHandler::setCaptureActive(bool active)
 {
+    // Decoder recreation must not undo an explicit keyboard release.
+    if (m_MacKeyboardEnabled && active && m_MacKeyboardReleased) return;
     if (active) {
         // If we're in relative mode, try to activate SDL's relative mouse mode
         if (m_AbsoluteMouseMode || SDL_SetRelativeMouseMode(SDL_TRUE) < 0) {

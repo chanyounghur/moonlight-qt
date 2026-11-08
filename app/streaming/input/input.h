@@ -4,6 +4,7 @@
 #include "backend/computermanager.h"
 
 #include "SDL_compat.h"
+#include "keymapper.h"
 
 struct GamepadState {
     SDL_GameController* controller;
@@ -156,6 +157,12 @@ public:
     QString getUnmappedGamepads();
 
 private:
+    void initializeMacKeyboard();
+    void handleTranslatedKeyEvent(SDL_KeyboardEvent* event);
+    bool m_MacKeyboardEnabled = false;
+    bool m_MacKeyboardReleased = false;
+    macinput::KeyMapper m_MacKeyMapper;
+
     enum KeyCombo {
         KeyComboQuit,
         KeyComboUngrabInput,

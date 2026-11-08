@@ -182,7 +182,7 @@ void SdlInputHandler::performSpecialKeyCombo(KeyCombo combo)
     }
 }
 
-void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
+void SdlInputHandler::handleTranslatedKeyEvent(SDL_KeyboardEvent* event)
 {
     short keyCode;
     char modifiers;
@@ -196,7 +196,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
     }
 
     // Check for our special key combos
-    if ((event->state == SDL_PRESSED) &&
+    if (!m_MacKeyboardEnabled && (event->state == SDL_PRESSED) &&
             (event->keysym.mod & KMOD_CTRL) &&
             (event->keysym.mod & KMOD_ALT) &&
             (event->keysym.mod & KMOD_SHIFT)) {
@@ -520,6 +520,7 @@ void SdlInputHandler::handleKeyEvent(SDL_KeyboardEvent* event)
 
 void SdlInputHandler::raiseAllKeys()
 {
+    m_MacKeyMapper.clear();
     if (m_KeysDown.isEmpty()) {
         return;
     }

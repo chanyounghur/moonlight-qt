@@ -42,6 +42,7 @@ void SdlInputHandler::handleMouseButtonEvent(SDL_MouseButtonEvent* event)
             // pressed to avoid sending an errant mouse button released
             // event to the host when clicking into our window (since
             // the pressed event was consumed by this code).
+            m_MacKeyboardReleased = false;
             setCaptureActive(true);
         }
 
