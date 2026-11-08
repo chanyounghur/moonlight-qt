@@ -95,7 +95,13 @@
     </Component>
 
     <DirectoryRef Id="INSTALLFOLDER">
+      <?ifdef var.MacKeyboardBuild ?>
+      <!-- Companion files inherit the executable's version, so WiX requires
+           an explicit, stable component identity for this file group. -->
+      <Component Id="Moonlight" Guid="f32bc1b2-3905-4d6d-a390-3a082d43527d">
+      <?else?>
       <Component Id="Moonlight">
+      <?endif?>
         <File Id="MoonlightExe"
               KeyPath="yes"
               Checksum="yes"
